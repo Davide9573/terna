@@ -1,2 +1,170 @@
 # terna
 Analysis and simulation of electricity production in Italy
+
+## Project Summary
+
+This project uploads, analyzes, and visualizes electricity generation in Italy over a specified period (typically a full year, using data from Terna, the Italian transmission grid operator). It then runs a scenario simulation that explores how increased photovoltaic (PV), wind, and nuclear generation capacity, combined with energy storage systems, could completely replace thermal (fossil-fueled) generation, and how much storage capacity and photovoltaic, wind, and nuclear generation would be needed to achieve this goal.
+
+---
+
+## Environment Setup
+
+### Prerequisites
+
+- Python 3.11 or later
+- A virtual environment (recommended)
+
+### Create and activate the virtual environment
+
+```bash
+python -m venv .venv
+
+# Windows
+.\.venv\Scripts\activate
+
+# Linux / macOS
+source .venv/bin/activate
+```
+
+### Install dependencies
+
+```bash
+pip install numpy pandas matplotlib
+```
+
+### Prepare the data
+
+The project ships with a pre-built `power_2025.npz` binary file ready to use. If you need to rebuild it from the raw CSVs (e.g. after updating any of the source files), run:
+
+```bash
+python convert_csv_into_pnz.py
+```
+
+This reads `power_generation_2025.csv`, `power_imp_exp_2025.csv`, and `power_consumption_2025.csv`, aligns every source to a common 15-minute time grid, fills missing slots with NaN, merges the three datasets, and saves the result to `power_2025.npz`.
+
+### Run the main script
+
+```bash
+python main.py
+```
+
+---
+
+## Project Content
+
+### Files overview
+
+| File | Description |
+|---|---|
+| `power_generation_2025.csv` | Raw generation-by-source data exported from the Terna portal |
+| `power_imp_exp_2025.csv` | Raw import/export data exported from the Terna portal |
+| `power_consumption_2025.csv` | Raw consumption data exported from the Terna portal |
+| `power_2025.npz` | Pre-processed binary cache (NumPy compressed format) |
+| `convert_csv_into_pnz.py` | One-off script to rebuild `power_2025.npz` from the three CSVs |
+| `parameters.py` | Project-wide constants (source list, colours, storage efficiencies) |
+| `utility.py` | Data I/O, `PowerData` dataclass, plotting and summary printing |
+| `simulator.py` | Core simulation logic (`simulate_surplus`) |
+| `optimizer.py` | Brute-force optimizer that finds the minimum `k_pv` / `k_w` / `max_capacity` combination |
+| `main.py` | Entry point: loads data, prints summaries, runs and plots the simulation |
+
+---
+
+### Data representation — `PowerData`
+
+All data is carried around in a single `PowerData` dataclass (defined in `utility.py`):
+
+```
+PowerData
+├── power_item : dict[str, np.ndarray]   # power value per source/item (GW), one value every 15 min
+├── start      : pd.Timestamp            # datetime of the first sample
+└── freq       : str                     # sampling interval (default "15min")
+```
+
+The generation sources tracked are defined in `parameters.py` as `SOURCES`:
+
+| Source | Description |
+|---|---|
+| `Thermal` | Gas, coal, and other fossil-fuel plants |
+| `Photovoltaic` | Solar PV |
+| `Wind` | Onshore and offshore wind |
+| `Hydro` | Run-of-river and reservoir hydroelectric |
+| `Geothermal` | Geothermal plants |
+| `Self-consumption` | Distributed / behind-the-meter generation |
+| `Net Import` | Net power imported from abroad (Import − Export) |
+| `Storage` | Energy storage discharge (added by the simulation) |
+
+In addition, `OTHER_POWER_ITEMS` tracks three complementary series that are loaded from dedicated CSVs and overlaid on the generation chart:
+
+| Item | Description |
+|---|---|
+| `Import` | Total gross power imported from abroad |
+| `Export` | Total gross power exported abroad |
+| `Consumption` | Total national electricity consumption |
+
+---
+
+### Utility functions
+
+- **`load_generation_data_from_csv`** — parses the generation CSV, builds a 15-minute time grid from the data's own date range, and returns a `PowerData` object.
+- **`load_import_export_data_from_csv`** — parses the import/export CSV, aggregates import and export across all countries, computes `Net Import`, and returns a `PowerData` object.
+- **`load_consumption_data_from_csv`** — parses the consumption CSV and returns a `PowerData` object.
+- **`merge_power_data`** — merges two or more `PowerData` objects into one, aligning on a common time index and summing arrays that share the same key.
+- **`save_power_data_to_npz` / `load_power_data_from_npz`** — persist and restore a `PowerData` (including the start timestamp) using NumPy's compressed `.npz` format.
+- **`plot_power_data`** — renders a stacked-area chart of instantaneous power output (GW) over time, overlaying the `Consumption`, `Import`, and `Export` curves, with adaptive x-axis formatting.
+- **`print_power_data_summary`** — prints a tabular summary per source showing total energy (TWh), peak instantaneous power (GW), and the timestamp of that peak. The final `Total` row shows the grand total energy and the peak of the combined output across all sources.
+
+---
+
+### Simulation — `simulate_surplus`
+
+The simulation answers the question:
+
+> *"If PV capacity were multiplied by a factor **k\_pv**, wind capacity by **k\_w**, and a storage with maximum capacity **C** GWh were added to the grid, how much thermal generation and net import could be avoided?"*
+
+#### Parameters
+
+| Parameter | Symbol | Unit | Description |
+|---|---|---|---|
+| `max_capacity` | $C$ | GWh | Maximum usable storage capacity |
+| `k_pv` | $k_{\text{pv}}$ | — | Multiplicative scale factor applied to the historical PV output |
+| `k_w` | $k_w$ | — | Multiplicative scale factor applied to the historical wind output |
+
+Storage round-trip efficiency is modelled with separate charge and discharge efficiencies:
+
+$$\eta_{\text{charge}} = \eta_{\text{discharge}} = 0.9$$
+
+#### Step-by-step logic (per 15-minute interval $t$)
+
+1. **Scale renewable sources** — update PV and wind output with their respective scale factors:
+
+$$P_{\text{PV},t}^{\text{new}} = k_{\text{pv}} \cdot P_{\text{PV},t}, \qquad P_{W,t}^{\text{new}} = k_w \cdot P_{W,t}$$
+
+2. **Compute total renewable surplus**:
+
+$$\text{surplus}_t = P_{\text{PV},t} \cdot (k_{\text{pv}} - 1) + P_{W,t} \cdot (k_w - 1)$$
+
+3. **Displace thermal generation** with the surplus:
+   - If $\text{surplus}_t > \text{Thermal}_t$: thermal is zeroed and the residual surplus carries over.
+   - Otherwise: thermal is reduced by the surplus and the surplus is exhausted.
+
+4. **Displace imports** with the remaining surplus:
+   - If $\text{surplus}_t > \text{Import}_t$: imports are zeroed and the residual surplus carries over.
+   - Otherwise: imports (and `Net Import`) are reduced by the surplus and the surplus is exhausted.
+
+5. **Charge storage** with any remaining surplus (capped at $C$, excess is curtailed):
+
+$$C_{t+1} = \min\!\left(C_t + \text{surplus} \cdot \frac{\eta_{\text{charge}}}{4},\; C\right)$$
+
+6. **Discharge storage to cover residual thermal demand**:
+
+$$P_{\text{storage},t} = \min\!\left(C_t \cdot 4 \cdot \eta_{\text{discharge}},\; \text{Thermal}_t\right)$$
+
+$$C_{t+1} = C_t - \frac{P_{\text{storage},t}}{4 \cdot \eta_{\text{discharge}}}$$
+
+7. **Discharge storage to cover residual imports** (if storage still has charge):
+
+$$P_{\text{storage},t} \mathrel{+}= \min\!\left(C_t \cdot 4 \cdot \eta_{\text{discharge}},\; \text{Import}_t\right)$$
+
+$$C_{t+1} = C_t - \frac{\Delta P}{4 \cdot \eta_{\text{discharge}}}$$
+
+The result is a new `PowerData` that shows the modified mix: reduced (or zeroed) thermal and imports, scaled-up PV and wind, and an additional `Storage` source representing storage discharge.
