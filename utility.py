@@ -313,7 +313,8 @@ def print_power_data_summary(data: PowerData) -> None:
     }
     print("-" * 93)
     for source, source_production in energy_production_sorted.items():
-        print(f"{source:<18} {source_production:>14.2f} {power_peaks[source]:>16.2f} {peak_times[source]:>20}")
+        if source_production > 0:
+            print(f"{source:<18} {source_production:>14.2f} {power_peaks[source]:>16.2f} {peak_times[source]:>20}")
 
     # Print the total energy production (sum of all sources), the maximum power peak, and the corresponding time
     total_power = sum(np.nan_to_num(vec, nan=0.0) for source, vec in data.power_item.items() if source in SOURCES)
@@ -325,14 +326,19 @@ def print_power_data_summary(data: PowerData) -> None:
     print(f"{'Total Production':<18} {total_all_sources:>14.2f} {total_power_peak:>16.2f} {total_power_peak_time:>20}")
 
     # Print the cumulative energy, the maximum peak, and the corresponding time, for each non-source power item
-    energy_other_items = {power_item: np.nansum(vec) / 4000 for power_item, vec in data.power_item.items() if power_item in OTHER_POWER_ITEMS} # Convert to TWh
-    energy_items_sorted = dict(sorted(energy_other_items.items(), key=lambda item: item[1], reverse=True))
+    energy_production = {power_item: np.nansum(vec) / 4000 for power_item, vec in data.power_item.items() if power_item in OTHER_POWER_ITEMS} # Convert to TWh
+    energy_production_sorted = dict(sorted(energy_production.items(), key=lambda item: item[1], reverse=True))
     power_peaks = {power_item: np.nanmax(vec) for power_item, vec in data.power_item.items() if power_item in OTHER_POWER_ITEMS}
     peak_times = {
         power_item: (data.start + int(np.nanargmax(vec)) * pd.Timedelta(data.freq)).strftime("%Y-%m-%d %H:%M")
         for power_item, vec in data.power_item.items() if power_item in OTHER_POWER_ITEMS
     }
     print("-" * 93)
-    for power_item, item_energy in energy_items_sorted.items():
-        print(f"{power_item:<18} {item_energy:>14.2f} {power_peaks[power_item]:>16.2f} {peak_times[power_item]:>20}")
+    for power_item, item_energy in energy_production_sorted.items():
+        if item_energy > 0:
+            print(f"{power_item:<18} {item_energy:>14.2f} {power_peaks[power_item]:>16.2f} {peak_times[power_item]:>20}")
     print("-" * 93)
+
+    # Calculate the total nuclear energy produced, in GWh
+    if "Nuclear" in data.power_item:
+        total_nuclear_energy = sum(data.power_item["Nuclear"]) / 4  # Assuming the power is in GW and the time step is 15 minutes

@@ -1,10 +1,11 @@
 
 ETA_CHARGE = 0.9  # Charge efficiency of the storage
 ETA_DISCHARGE = 0.9  # Discharge efficiency of the storage
-SOURCES = ["Thermal", "Self-consumption", "Photovoltaic", "Hydro", "Wind", "Geothermal", "Net Import", "Storage"]
+SOURCES = ["Net Import", "Thermal", "Nuclear", "Storage", "Self-consumption", "Photovoltaic", "Hydro", "Wind", "Geothermal"]
 SOURCE_COLORS = {
     "Net Import":       "#6600FF",
     "Thermal":          "#B22222",
+    "Nuclear":          "#0055FF",
     "Storage":          "#FFA500",
     "Self-consumption": "#808080",
     "Hydro":            "#87CEEB",

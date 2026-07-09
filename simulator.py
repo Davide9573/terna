@@ -4,12 +4,13 @@ from utility import PowerData
 import numpy as np
 
 
-def simulate_surplus(power_in: PowerData, max_capacity: float, k_pv: float, k_w: float) -> PowerData:
+def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv: float, k_w: float, nuke: bool) -> PowerData:
     """
     Simulate the production of electricity, starting from the production data by source, the electric power generation using:
     - an increased storage capacity max_capacity (GWh) - through electrochemical batteries or pumped storage - to store surplus energy and release it when needed
     - an increased photovoltaic power, by a factor k_pv relative to the current production,
-    - an increased wind power, by a factor k_w relative to the current production.
+    - an increased wind power, by a factor k_w relative to the current production,
+    - an optional nuclear power production, which can be included or excluded from the simulation.
     The simulation returns a dictionary with the updated electric power generation.
 
     Parameters
@@ -22,6 +23,8 @@ def simulate_surplus(power_in: PowerData, max_capacity: float, k_pv: float, k_w:
         Factor by which to increase the photovoltaic power.
     k_w : float
         Factor by which to increase the wind power.
+    nuke : bool
+        Whether to include nuclear power in the simulation.
 
     Returns
     ----------
@@ -72,6 +75,20 @@ def simulate_surplus(power_in: PowerData, max_capacity: float, k_pv: float, k_w:
             new_power_item["Import"][t] -= charge  # Reduce the importation by the same amount
             new_power_item["Net Import"][t] -= charge # Reduce the net importation by the same amount
             capacity -= charge / 4 / ETA_DISCHARGE  # Discharge the storage considering the discharging efficiency
+        if nuke:
+            new_power_item["Nuclear"][t] = new_power_item["Thermal"][t]  # Update the nuclear production with the thermal production, as it is now included in the nuclear production
+            new_power_item["Thermal"][t] = 0  # Set the thermal production to 0, as it is now included in the nuclear production
+
+    if nuke:
+        nuclear_base_load = np.max(new_power_item["Nuclear"]) * 0.3  # Nuclear base load, assumed to be 30% of the peak power
+        for t in range(N_INTERVALS):
+            if new_power_item["Nuclear"][t] < nuclear_base_load:
+                nuclear_surplus = nuclear_base_load - new_power_item["Nuclear"][t]  # Surplus of nuclear production to reach the base load
+                new_power_item["Nuclear"][t] = nuclear_base_load  # Set the nuclear production to the base load
+                new_power_item["Import"][t] -= nuclear_surplus  # Reduce the importation due to the nuclear surplus
+                if new_power_item["Import"][t] < 0:
+                    new_power_item["Import"][t] = 0  # Set the importation to 0 if it is negative
+                new_power_item["Net Import"][t] = new_power_item["Import"][t] - new_power_item["Export"][t]  # Update the net importation
 
     return PowerData(power_item=new_power_item, start=power_in.start, freq=power_in.freq)
     

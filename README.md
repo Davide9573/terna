@@ -3,7 +3,7 @@ Analysis and simulation of electricity production in Italy
 
 ## Project Summary
 
-This project uploads, analyzes, and visualizes electricity generation in Italy over a specified period (typically a full year, using data from Terna, the Italian transmission grid operator). It then runs a scenario simulation that explores how increased photovoltaic (PV) and wind generation capacity, combined with energy storage systems, could completely replace thermal (fossil-fueled) generation, and how much storage capacity and photovoltaic and wind generation would be needed to achieve this goal.
+This project analyzes and visualizes the Italian electricity budget over a specified period (typically a full year), using data from Terna, the Italian transmission grid operator. It then runs an alternative scenario simulation that explores how increased photovoltaic (PV) and wind generation capacity, combined with energy storage systems, could completely replace thermal (fossil-fueled) generation, and how much storage capacity and photovoltaic and wind generation would be needed to achieve this goal.
 
 ---
 
@@ -52,7 +52,7 @@ python main.py
 
 ## Project Content
 
-### Files overview
+### File overview
 
 | File | Description |
 |---|---|
@@ -73,7 +73,7 @@ All data is carried around in a single `PowerData` dataclass (defined in `utilit
 
 ```
 PowerData
-├── power_item : dict[str, np.ndarray]   # power value per source/item (GW), one value every 15 min
+├── power_item : dict[str, np.ndarray]   # power values per source/item (GW), one value every 15 min
 ├── start      : pd.Timestamp            # datetime of the first sample
 └── freq       : str                     # sampling interval (default "15min")
 ```
@@ -89,15 +89,16 @@ The generation sources tracked are defined in `parameters.py` as `SOURCES`:
 | `Geothermal` | Geothermal plants |
 | `Self-consumption` | Distributed / behind-the-meter generation |
 | `Net Import` | Net power imported from abroad (Import − Export) |
+| `Nuclear` | Nuclear plants (added by the simulation) |
 | `Storage` | Energy storage discharge (added by the simulation) |
 
 In addition, `OTHER_POWER_ITEMS` tracks three complementary series that are loaded from dedicated CSVs and overlaid on the generation chart:
 
 | Item | Description |
 |---|---|
+| `Consumption` | Total national electricity consumption |
 | `Import` | Total gross power imported from abroad |
 | `Export` | Total gross power exported abroad |
-| `Consumption` | Total national electricity consumption |
 
 ---
 
@@ -113,11 +114,11 @@ In addition, `OTHER_POWER_ITEMS` tracks three complementary series that are load
 
 ---
 
-### Simulation — `simulate_surplus`
+### Simulation — `simulate_alternative_scenario`
 
 The simulation answers the question:
 
-> *"If PV capacity were multiplied by a factor **k\_pv**, wind capacity by **k\_w**, and a storage with maximum capacity **C** GWh were added to the grid, how much thermal generation and net import could be avoided?"*
+> *"If PV capacity were multiplied by a factor **k\_pv**, wind capacity by **k\_w**, and a storage with maximum capacity **C** GWh were added to the grid, how much thermal generation and net import could be avoided? And what if nuclear power is added?"*
 
 #### Parameters
 
@@ -126,10 +127,23 @@ The simulation answers the question:
 | `max_capacity` | $C$ | GWh | Maximum usable storage capacity |
 | `k_pv` | $k_{\text{pv}}$ | — | Multiplicative scale factor applied to the historical PV output |
 | `k_w` | $k_w$ | — | Multiplicative scale factor applied to the historical wind output |
+| `nuke` | — | boolean | Whether a simulated contribution from nuclear power has to be considered |
 
 Storage round-trip efficiency is modelled with separate charge and discharge efficiencies:
 
 $$\eta_{\text{charge}} = \eta_{\text{discharge}} = 0.9$$
+
+#### Simulation assumptions
+
+1. Consumption remains unchanged, as do all other power-related parameters not specified below.
+
+2. Photovoltaic and wind generation are simply multiplied by the respective $k$ factor.
+
+3. Whether possible, excess energy is used to reduce thermal generation and, secondarily, to charge the storage system with a specified charge efficiency $\eta_{\text{charge}}$.
+
+4. Whether possible, stored energy is used to reduce thermal generation and, secondarily, energy import, with a specified discharge efficiency $\eta_{\text{discharge}}$.
+
+5. Storage capacity can never exceed the specified maximum capacity.
 
 #### Step-by-step logic (per 15-minute interval $t$)
 
