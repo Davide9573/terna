@@ -287,7 +287,7 @@ def plot_power_data(data: PowerData) -> None:
     plt.setp(ax.get_xticklabels(), rotation=90, ha="center", va="top")
     ax.set_xlabel("")
 
-    ax.set_title("Electric production by source")
+    ax.set_title("Italian Electric Balance over Time", fontsize=16)
     ax.set_ylabel("Electric power generated (GW)")
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles[::-1], labels[::-1], loc="upper left")

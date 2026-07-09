@@ -3,7 +3,7 @@ Analysis and simulation of electricity production in Italy
 
 ## Project Summary
 
-This project uploads, analyzes, and visualizes electricity generation in Italy over a specified period (typically a full year, using data from Terna, the Italian transmission grid operator). It then runs a scenario simulation that explores how increased photovoltaic (PV), wind, and nuclear generation capacity, combined with energy storage systems, could completely replace thermal (fossil-fueled) generation, and how much storage capacity and photovoltaic, wind, and nuclear generation would be needed to achieve this goal.
+This project uploads, analyzes, and visualizes electricity generation in Italy over a specified period (typically a full year, using data from Terna, the Italian transmission grid operator). It then runs a scenario simulation that explores how increased photovoltaic (PV) and wind generation capacity, combined with energy storage systems, could completely replace thermal (fossil-fueled) generation, and how much storage capacity and photovoltaic and wind generation would be needed to achieve this goal.
 
 ---
 
@@ -59,12 +59,10 @@ python main.py
 | `power_generation_2025.csv` | Raw generation-by-source data exported from the Terna portal |
 | `power_imp_exp_2025.csv` | Raw import/export data exported from the Terna portal |
 | `power_consumption_2025.csv` | Raw consumption data exported from the Terna portal |
-| `power_2025.npz` | Pre-processed binary cache (NumPy compressed format) |
-| `convert_csv_into_pnz.py` | One-off script to rebuild `power_2025.npz` from the three CSVs |
+| `convert_csv_into_pnz.py` | One-off script to build `power_2025.npz` from the three CSVs |
 | `parameters.py` | Project-wide constants (source list, colours, storage efficiencies) |
 | `utility.py` | Data I/O, `PowerData` dataclass, plotting and summary printing |
 | `simulator.py` | Core simulation logic (`simulate_surplus`) |
-| `optimizer.py` | Brute-force optimizer that finds the minimum `k_pv` / `k_w` / `max_capacity` combination |
 | `main.py` | Entry point: loads data, prints summaries, runs and plots the simulation |
 
 ---

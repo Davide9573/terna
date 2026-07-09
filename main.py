@@ -7,7 +7,7 @@ NPZ_PATH = Path(__file__).parent / "power_2025.npz"
 if __name__ == "__main__":
     # Load consumption, generation and import/export data from .npz file
     data = utility.load_power_data_from_npz(NPZ_PATH)
-    print(f"Summary of power data loaded from {NPZ_PATH}:")
+    print(f"\nSummary of power data loaded from {NPZ_PATH}:")
     utility.print_power_data_summary(data)
     utility.plot_power_data(data)
     
