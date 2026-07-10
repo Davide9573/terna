@@ -1,4 +1,4 @@
-from parameters import OTHER_POWER_ITEMS, SOURCES
+from parameters import NUCLEAR_BASE_LOAD_FACTOR, OTHER_POWER_ITEMS, SOURCES
 from parameters import ETA_CHARGE, ETA_DISCHARGE
 from utility import PowerData
 import numpy as np
@@ -80,7 +80,7 @@ def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv
             new_power_item["Thermal"][t] = 0  # Set the thermal production to 0, as it is now included in the nuclear production
 
     if nuke:
-        nuclear_base_load = np.max(new_power_item["Nuclear"]) * 0.3  # Nuclear base load, assumed to be 30% of the peak power
+        nuclear_base_load = np.max(new_power_item["Nuclear"]) * NUCLEAR_BASE_LOAD_FACTOR  # Nuclear base load, assumed to be NUCLEAR_BASE_LOAD_FACTOR of the peak power
         for t in range(N_INTERVALS):
             if new_power_item["Nuclear"][t] < nuclear_base_load:
                 nuclear_surplus = nuclear_base_load - new_power_item["Nuclear"][t]  # Surplus of nuclear production to reach the base load

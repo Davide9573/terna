@@ -145,6 +145,14 @@ $$\eta_{\text{charge}} = \eta_{\text{discharge}} = 0.9$$
 
 5. Storage capacity can never exceed the specified maximum capacity.
 
+In case of added nuclear power:  
+
+6. Residual thermal generation is completely replaced by nuclear power.
+
+7. Nuclear power peak is used to calculate the nuclear base load, assuming that nuclear power output cannot be modulated arbitrarily (it can never drop below a specified fraction of the peak).
+
+8. Whether possible, excess energy is used to reduce energy import.
+
 #### Step-by-step logic (per 15-minute interval $t$)
 
 1. **Scale renewable sources** — update PV and wind output with their respective scale factors:
