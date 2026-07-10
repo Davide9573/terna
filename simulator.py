@@ -85,6 +85,13 @@ def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv
             if new_power_item["Nuclear"][t] < nuclear_base_load:
                 nuclear_surplus = nuclear_base_load - new_power_item["Nuclear"][t]  # Surplus of nuclear production to reach the base load
                 new_power_item["Nuclear"][t] = nuclear_base_load  # Set the nuclear production to the base load
+                if new_power_item["Storage"][t] >= nuclear_surplus:
+                    new_power_item["Storage"][t] -= nuclear_surplus  # Reduce the storage by the nuclear surplus
+                    capacity += nuclear_surplus / 4 / ETA_DISCHARGE  # Increase the storage capacity by the nuclear surplus
+                else:
+                    nuclear_surplus -= new_power_item["Storage"][t]  # Reduce the nuclear surplus by the storage
+                    capacity += new_power_item["Storage"][t] / 4 / ETA_DISCHARGE  # Increase the storage capacity by the storage
+                    new_power_item["Storage"][t] = 0  # Set the storage to 0
                 new_power_item["Import"][t] -= nuclear_surplus  # Reduce the importation due to the nuclear surplus
                 if new_power_item["Import"][t] < 0:
                     new_power_item["Import"][t] = 0  # Set the importation to 0 if it is negative

@@ -12,10 +12,10 @@ if __name__ == "__main__":
     utility.plot_power_data(data)
     
     # Simulate the production of electricity with surplus from photovoltaic, wind and storage
-    max_capacity_=0
-    k_pv_=1
+    max_capacity_=50
+    k_pv_=3
     k_w_=1
-    nuke =False
+    nuke =True
     simulated_data = simulator.simulate_alternative_scenario(data, max_capacity=max_capacity_, k_pv=k_pv_, k_w=k_w_, nuke=nuke)
 
     # Plot the simulated data for consumption, generation and import/export
