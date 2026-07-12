@@ -183,64 +183,26 @@ The result is a new `PowerData` that shows the modified mix: reduced (or zeroed)
 
 ---
 
-## Project Content
+### Cost Computation
 
-### File overview
+The function computes the cost difference of the simulated scenario with respect to the current one. Generally, the simulated scenario entails additional costs due to increased photovoltaic, wind and (optional) nuclear power and, above all, increased storage capacity. On the other hand, savings are also achieved by reducing thermal energy production and net energy imports.
+The costs are computed taking into account:
+- Levelized Costs of Electricity (LCOE) for the different power sources, from https://www.eia.gov/outlooks/aeo/electricity_generation/pdf/LCOE_report.pdf
+- Levelized Costs of Storage (LCOS), the counterpoart to LCOE, from https://www.pnnl.gov/projects/esgc-cost-performance/lcos-estimates
+- The price Italy pays for imported electricity (about $5.6 billion in 2024) divided by the imported amount of electrical energy (about 58.3 TWh on the same year), from https://wits.worldbank.org/trade/comtrade/en/country/ITA/year/2024/tradeflow/Imports/partner/ALL/product/271600
 
-| File | Description |
-|---|---|
-| `power_generation_2025.csv` | Raw generation-by-source data exported from the Terna portal |
-| `power_imp_exp_2025.csv` | Raw import/export data exported from the Terna portal |
-| `power_consumption_2025.csv` | Raw consumption data exported from the Terna portal |
-| `convert_csv_into_pnz.py` | One-off script to build `power_2025.npz` from the three CSVs |
-| `parameters.py` | Project-wide constants (source list, colours, storage efficiencies) |
-| `utility.py` | Data I/O, `PowerData` dataclass, plotting and summary printing |
-| `simulator.py` | Core simulation logic (`simulate_surplus`) |
-| `main.py` | Entry point: loads data, prints summaries, runs and plots the simulation |
+| Source | Assumed Cost [$/MWh] | Description |
+|---|---|---|
+| Net Import | 96.05 | Average price of imported electricity |
+| Thermal | 58.47 | LCOE of utility thermal (natural gas combined-cycle) power |
+| Nuclear | 87.81 | LCOE |
+| Photovoltaic | 40.38 | LCOE of photovoltaic power |
+| Wind | 58.33 | LCOE of wind power |
+| Storage | 35.30 | LCOS of storage |
+|---|---|---|
 
----
+<div align="center">
+  <img src="Simulated_Scenario_Additional_Costs.png" alt="Immagine" width="500">
 
-### Data representation — `PowerData`
-
-All data is carried around in a single `PowerData` dataclass (defined in `utility.py`):
-
-```
-PowerData
-├── power_item : dict[str, np.ndarray]   # power values per source/item (GW), one value every 15 min
-├── start      : pd.Timestamp            # datetime of the first sample
-└── freq       : str                     # sampling interval (default "15min")
-```
-
-The generation sources tracked are defined in `parameters.py` as `SOURCES`:
-
-| Source | Description |
-|---|---|
-| `Thermal` | Gas, coal, and other fossil-fuel plants |
-| `Photovoltaic` | Solar PV |
-| `Wind` | Onshore and offshore wind |
-| `Hydro` | Run-of-river and reservoir hydroelectric |
-| `Geothermal` | Geothermal plants |
-| `Self-consumption` | Distributed / behind-the-meter generation |
-| `Net Import` | Net power imported from abroad (Import − Export) |
-| `Nuclear` | Nuclear plants (added by the simulation) |
-| `Storage` | Energy storage discharge (added by the simulation) |
-
-In addition, `OTHER_POWER_ITEMS` tracks three complementary series that are loaded from dedicated CSVs and overlaid on the generation chart:
-
-| Item | Description |
-|---|---|
-| `Consumption` | Total national electricity consumption |
-| `Import` | Total gross power imported from abroad |
-| `Export` | Total gross power exported abroad |
-
----
-
-### Utility functions
-
-- **`load_generation_data_from_csv`** — parses the generation CSV, builds a 15-minute time grid from the data's own date range, and returns a `PowerData` object.
-- **`load_import_export_data_from_csv`** — parses the import/export CSV, aggregates import and export across all countries, computes `Net Import`, and returns a `PowerData` object.
-- **`load_consumption_data_from_csv`** — parses the consumption CSV and returns a `PowerData` object.
-- **`merge_power_data`** — merges two or more `PowerData` objects into one, aligning on a common time index and summing arrays that share the same key.
-- **`save_power_data_to_npz` / `load_power_data_from_npz`** — persist and restore a `PowerData` (including the start timestamp) using NumPy's compressed `.npz` format.
-- **`plot_power_data`** — renders a stacked-area chart of instantaneous power output (GW) over time, overlaying the `Consumption`, `Import`, and `Export` curves, with adaptive x-axis formatting.
-- **`print_power_data_summary`** — prints a tabular summary per source showing total energy (TWh), peak instantaneous power (GW), and the timestamp of that peak. The final `Total` row shows the grand total energy and the peak of the combined output across all sources.
+  Summary of simulated scenario differential costs.
+</div>
