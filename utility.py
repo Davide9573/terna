@@ -7,10 +7,32 @@ import pandas as pd
 
 @dataclass
 class PowerData:
-    """Data structure that collects production data (per source), consumption and import/export data, and the start timestamp."""
-    power_item: dict[str, np.ndarray] = field(default_factory=dict)
+    """Data structure collecting:
+    - power production (per source), consumption and import/export data,
+    - power peaks (per item) and respective date/time of occurrence,
+    - start and end timestamp
+    duration of samples is assumed to be 15 minutes."""
+    power_item: dict[str, np.ndarray] = field(default_factory=dict)  # power values in GW
+    power_peaks: dict[str, tuple[float, str]] = field(default_factory=dict)  # power values in GW
     start: pd.Timestamp = pd.Timestamp("1970-01-01")
-    freq: str = "15min"
+    end: pd.Timestamp = pd.Timestamp("1970-01-01")
+
+@dataclass
+class EnergyData:
+    """Data structure collecting:
+    - energy production (per source), consumption and import/export data,
+    - duration of the time period considered."""
+    energy_item: dict[str, float] = field(default_factory=dict)  # energy values in TWh
+    duration: pd.Timedelta = pd.Timedelta("0h") # in hours
+
+@dataclass
+class CostData:
+    """Data structure collecting:
+    - cost data for different energy sources,
+    - duration of the time period considered."""
+    cost_item: dict[str, float] = field(default_factory=dict)  # cost values in bilions $
+    duration: pd.Timedelta = pd.Timedelta("0h") # in hours
+
 
 def load_generation_data_from_csv(csv_path: Path) -> PowerData:
     """
@@ -47,7 +69,7 @@ def load_generation_data_from_csv(csv_path: Path) -> PowerData:
         )
         generation[source] = src_series.to_numpy(dtype=np.float64)
 
-    return PowerData(power_item=generation, start=start)
+    return PowerData(power_item=generation, start=start, end=end + pd.Timedelta(minutes=15))  # Include the last interval in the end timestamp
 
 
 def load_consumption_data_from_csv(csv_path: Path) -> PowerData:
@@ -81,7 +103,7 @@ def load_consumption_data_from_csv(csv_path: Path) -> PowerData:
             .to_numpy(dtype=np.float64)
         )
     }
-    return PowerData(power_item=consumption, start=start)
+    return PowerData(power_item=consumption, start=start, end=end + pd.Timedelta(minutes=15))
 
 
 def load_import_export_data_from_csv(csv_path: Path) -> PowerData:
@@ -119,7 +141,28 @@ def load_import_export_data_from_csv(csv_path: Path) -> PowerData:
         "Net Import": net_import.reindex(expected_index).to_numpy(dtype=np.float64),
     }
 
-    return PowerData(power_item=import_export, start=start)
+    return PowerData(power_item=import_export, start=start, end=end + pd.Timedelta(minutes=15))
+
+
+def save_power_data_to_npz(data: PowerData, npz_path: Path) -> None:
+    """Save PowerData to a .npz file (compressed NumPy format)."""
+    np.savez(npz_path, __start__=np.array([data.start.isoformat()]), __end__=np.array([data.end.isoformat()]), **data.power_item)
+
+
+def load_power_data_from_npz(npz_path: Path) -> PowerData:
+    """
+    Load and return a PowerData instance from a .npz file
+    previously saved with save_data_to_npz().
+    """
+    raw = np.load(npz_path, allow_pickle=False)
+    start = pd.Timestamp(str(raw["__start__"][0])) if "__start__" in raw.files else pd.Timestamp("1970-01-01")
+    end = pd.Timestamp(str(raw["__end__"][0])) if "__end__" in raw.files else pd.Timestamp("1970-01-01")
+    generation = {
+        key: np.nan_to_num(raw[key], nan=0.0)
+        for key in raw.files
+        if key != "__start__" and key != "__end__"
+    }
+    return PowerData(power_item=generation, start=start, end=end)
 
 
 def merge_power_data(*datasets: PowerData) -> PowerData:
@@ -144,13 +187,12 @@ def merge_power_data(*datasets: PowerData) -> PowerData:
     if not datasets:
         raise ValueError("At least one PowerData instance must be provided for merging.")
 
-    freq = datasets[0].freq
-    if any(d.freq != freq for d in datasets):
-        raise ValueError("All datasets must have the same frequency.")
-
     # Construct the common temporal index as the union of all dataset ranges
     all_starts = [d.start for d in datasets]
     global_start = min(all_starts)
+    all_ends = [d.end for d in datasets]
+    global_end = max(all_ends)
+    freq = "15min"  # Assuming all datasets have the same frequency of 15 minutes
 
     def _array_to_series(arr: np.ndarray, start: pd.Timestamp, freq: str) -> pd.Series:
         idx = pd.date_range(start=start, periods=len(arr), freq=freq)
@@ -161,7 +203,7 @@ def merge_power_data(*datasets: PowerData) -> PowerData:
         all_keys: set[str] = set()
         for d in dicts:
             all_keys.update(d.keys())
-
+    
         # Global index (union of all present ranges)
         all_indices: list[pd.DatetimeIndex] = []
         for i, d in enumerate(dicts):
@@ -193,31 +235,44 @@ def merge_power_data(*datasets: PowerData) -> PowerData:
         # Consumption is the sum of all consumption sources, i.e., the arrays with keys in SOURCES.
         merged_power_item["Consumption"] = np.full(n_intervals, np.nan, dtype=np.float64)
 
+    # Compute the global end time assuming frequency is 15 minutes and the length of the arrays is consistent
+    all_ends = [d.end for d in datasets]
+    global_end = max(all_ends)
+
     return PowerData(
         power_item=merged_power_item,
         start=global_start,
-        freq=freq,
+        end=global_end
     )
 
 
-def save_power_data_to_npz(data: PowerData, npz_path: Path) -> None:
-    """Save PowerData to a .npz file (compressed NumPy format)."""
-    np.savez(npz_path, __start__=np.array([data.start.isoformat()]), **data.power_item)
+def compute_peaks(power_data: PowerData):
+    power_data.power_peaks = {}
+    # Compute the total production across all sources for each time interval
+    total_power = np.zeros(len(next(iter(power_data.power_item.values()))))  # Initialize total power array
+    for key in power_data.power_item.keys():
+        if key in SOURCES:
+            total_power += np.nan_to_num(power_data.power_item[key], nan=0.0)
+    power_data.power_item["Total Production"] = total_power
+    # Compute the power curtailment across all sources for each time interval
+    curtailment_power = total_power.copy()  # Initialize curtailment power array
+    curtailment_power -= np.nan_to_num(power_data.power_item["Consumption"], nan=0.0)
+    power_data.power_item["Curtailment"] = curtailment_power
+    # Compute the peak power and corresponding time for each source and other power items
+    for key in power_data.power_item.keys():
+        power_peak = np.nanmax(power_data.power_item[key])
+        peak_time = (power_data.start + int(np.nanargmax(power_data.power_item[key])) * pd.Timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M")
+        power_data.power_peaks[key] = (power_peak, peak_time)
 
 
-def load_power_data_from_npz(npz_path: Path) -> PowerData:
-    """
-    Load and return a PowerData instance from a .npz file
-    previously saved with save_data_to_npz().
-    """
-    raw = np.load(npz_path, allow_pickle=False)
-    start = pd.Timestamp(str(raw["__start__"][0])) if "__start__" in raw.files else pd.Timestamp("1970-01-01")
-    generation = {
-        key: np.nan_to_num(raw[key], nan=0.0)
-        for key in raw.files
-        if key != "__start__"
-    }
-    return PowerData(power_item=generation, start=start)
+def to_energy(power_data: PowerData) -> EnergyData:
+    energy_data = EnergyData()
+    for key in power_data.power_item.keys():
+        energy_data.energy_item[key] = np.nansum(power_data.power_item[key]) / 4000  # Convert from GW to TWh, assuming 15-minute intervals
+    # sort the energy_item dictionary by energy values in descending order
+    energy_data.energy_item = {k: v for k, v in sorted(energy_data.energy_item.items(), key=lambda item: item[1], reverse=True)}
+    energy_data.duration=power_data.end - power_data.start
+    return energy_data
 
 
 def plot_power_data(data: PowerData) -> None:
@@ -227,11 +282,11 @@ def plot_power_data(data: PowerData) -> None:
     Parameters
     ----------
     data : PowerData
-        Data structure to plot.
+        the power data and corresponding energy data to plot.
     """
     power_item = data.power_item
     start = data.start
-    freq = data.freq
+    freq = pd.Timedelta(minutes=15)  # Assuming 15-minute intervals for the power data
     import matplotlib.pyplot as plt
     import matplotlib.ticker as mticker
 
@@ -296,49 +351,54 @@ def plot_power_data(data: PowerData) -> None:
     plt.show()
 
 
-def print_power_data_summary(data: PowerData) -> None:
-    """Print a summary of the power data to the console."""
+def print_power_data_summary(data: tuple[PowerData, EnergyData]) -> None:
+    """Print a summary of the power data to the console.
+    
+    Parameters
+    ----------
+    data : tuple[PowerData, EnergyData]
+        the power data and corresponding energy data to print.
+    """
 
+    power_data = data[0]
+    energy_data = data[1]
     # Print the table header
     print("-" * 93)
     print(f"{'Source':<18} {'Energy (TWh)':>14} {'Power Peak (GW)':>16} {'Peak Time':>20}")
 
     # Print the energy production, peak power, and corresponding time for each source
-    energy_production = {source: np.nansum(vec) / 4000 for source, vec in data.power_item.items() if source in SOURCES} # Convert to TWh
-    energy_production_sorted = dict(sorted(energy_production.items(), key=lambda item: item[1], reverse=True))
-    power_peaks = {source: np.nanmax(vec) for source, vec in data.power_item.items() if source in SOURCES}
-    peak_times = {
-        source: (data.start + int(np.nanargmax(vec)) * pd.Timedelta(data.freq)).strftime("%Y-%m-%d %H:%M")
-        for source, vec in data.power_item.items() if source in SOURCES
-    }
     print("-" * 93)
-    for source, source_production in energy_production_sorted.items():
-        if source_production > 0:
-            print(f"{source:<18} {source_production:>14.2f} {power_peaks[source]:>16.2f} {peak_times[source]:>20}")
+    for source in energy_data.energy_item.keys():
+        if source in SOURCES and energy_data.energy_item[source] > 0:
+                print(f"{source:<18} {energy_data.energy_item[source]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
 
-    # Print the total energy production (sum of all sources), the maximum power peak, and the corresponding time
-    total_power = sum(np.nan_to_num(vec, nan=0.0) for source, vec in data.power_item.items() if source in SOURCES)
-    total_power_peak_idx = int(np.argmax(total_power))
-    total_power_peak = total_power[total_power_peak_idx]
-    total_power_peak_time = (data.start + total_power_peak_idx * pd.Timedelta(data.freq)).strftime("%Y-%m-%d %H:%M")
-    total_all_sources = sum(energy_production.values())
+    # Print the total energy production (sum of all sources) and curtailment, including respective maximum power peaks and time
     print("-" * 93)
-    print(f"{'Total Production':<18} {total_all_sources:>14.2f} {total_power_peak:>16.2f} {total_power_peak_time:>20}")
+    print(f"{'Total Production':<18} {energy_data.energy_item['Total Production']:>14.2f} {power_data.power_peaks['Total Production'][0]:>16.2f} {power_data.power_peaks['Total Production'][1]:>20}")
+    print(f"{'Curtailment':<18} {energy_data.energy_item['Curtailment']:>14.2f} {power_data.power_peaks['Curtailment'][0]:>16.2f} {power_data.power_peaks['Curtailment'][1]:>20}")
 
     # Print the cumulative energy, the maximum peak, and the corresponding time, for each non-source power item
-    energy_production = {power_item: np.nansum(vec) / 4000 for power_item, vec in data.power_item.items() if power_item in OTHER_POWER_ITEMS} # Convert to TWh
-    energy_production_sorted = dict(sorted(energy_production.items(), key=lambda item: item[1], reverse=True))
-    power_peaks = {power_item: np.nanmax(vec) for power_item, vec in data.power_item.items() if power_item in OTHER_POWER_ITEMS}
-    peak_times = {
-        power_item: (data.start + int(np.nanargmax(vec)) * pd.Timedelta(data.freq)).strftime("%Y-%m-%d %H:%M")
-        for power_item, vec in data.power_item.items() if power_item in OTHER_POWER_ITEMS
-    }
     print("-" * 93)
-    for power_item, item_energy in energy_production_sorted.items():
-        if item_energy > 0:
-            print(f"{power_item:<18} {item_energy:>14.2f} {power_peaks[power_item]:>16.2f} {peak_times[power_item]:>20}")
+    for source in energy_data.energy_item.keys():
+        if source in OTHER_POWER_ITEMS and energy_data.energy_item[source] > 0:
+            print(f"{source:<18} {energy_data.energy_item[source]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
     print("-" * 93)
 
-    # Calculate the total nuclear energy produced, in GWh
-    if "Nuclear" in data.power_item:
-        total_nuclear_energy = sum(data.power_item["Nuclear"]) / 4  # Assuming the power is in GW and the time step is 15 minutes
+
+def print_cost_data_summary(cost_data: CostData) -> None:
+    """Print a summary of the cost data to the console.
+    
+    Parameters
+    ----------
+    cost_data : CostData
+        the cost data to print.
+    """
+
+    print("-" * 60)
+    print(f"{'Source':<18} {'Additional Cost (billions of $ per year)':>20}")
+    print("-" * 60)
+    for source, cost in cost_data.cost_item.items():
+        print(f"{source:<18} {cost:>20.2f}")
+    print("-" * 60)
+    print(f"{'Total':<18} {sum(cost_data.cost_item.values()):>20.2f}")
+    print("-" * 60)

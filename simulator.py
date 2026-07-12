@@ -1,10 +1,13 @@
-from parameters import NUCLEAR_BASE_LOAD_FACTOR, OTHER_POWER_ITEMS, SOURCES
-from parameters import ETA_CHARGE, ETA_DISCHARGE
-from utility import PowerData
+from turtle import pd
+
+from parameters import ETA_CHARGE, ETA_DISCHARGE, NUCLEAR_BASE_LOAD_FACTOR
+from parameters import SOURCES, OTHER_POWER_ITEMS, SOURCE_COSTS
+from utility import PowerData, EnergyData, CostData
+from utility import compute_peaks, to_energy
 import numpy as np
 
 
-def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv: float, k_w: float, nuke: bool) -> PowerData:
+def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv: float, k_w: float, nuke: bool) -> tuple[PowerData, EnergyData]:
     """
     Simulate the production of electricity, starting from the production data by source, the electric power generation using:
     - an increased storage capacity max_capacity (GWh) - through electrochemical batteries or pumped storage - to store surplus energy and release it when needed
@@ -28,8 +31,8 @@ def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv
 
     Returns
     ----------
-    dict[str, np.ndarray]
-        Updated electric power generation (for each quarter hour, in GW).
+    tuple[PowerData, EnergyData]
+        Updated electric power generation (for each quarter hour, in GW) and corresponding energy data.
     """
     new_power_item: dict[str, np.ndarray] = {} # Dizionario per la produzione simulata
     N_INTERVALS = len(power_in.power_item["Photovoltaic"]) # Numero di intervalli temporali (quarti d'ora) nella simulazione
@@ -97,5 +100,37 @@ def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv
                     new_power_item["Import"][t] = 0  # Set the importation to 0 if it is negative
                 new_power_item["Net Import"][t] = new_power_item["Import"][t] - new_power_item["Export"][t]  # Update the net importation
 
-    return PowerData(power_item=new_power_item, start=power_in.start, freq=power_in.freq)
+    power_after = PowerData(power_item=new_power_item, start=power_in.start, end=power_in.end)
+    compute_peaks(power_after)  # Compute the peaks of the simulated power data
+    return (power_after, to_energy(power_after))  # Return the simulated power data and the corresponding energy data
     
+
+def simulate_costs(energy_before: EnergyData, energy_after: EnergyData) -> CostData:
+    """
+    Simulate the costs of electricity production before and after the simulation, based on the energy data provided.
+    Parameters
+    ---------
+    energy_before : EnergyData
+        Current energy data, divided by type (for each quarter hour, in MWh).
+    energy_after : EnergyData
+        Energy data after the simulation, divided by type (for each quarter hour, in MWh).
+
+    Returns
+    ----------
+    CostData
+        Data structure containing the simulated costs.
+    """
+    annual_costs = CostData()
+    energy_after.duration = energy_after.duration if energy_after.duration.days > 0 else pd.Timedelta(days=1)  # Avoid division by zero
+    # Reparametrization factor to convert the costs to a solar year, based on the duration of the simulation, in hours
+    k_year = 365 / energy_after.duration.days
+    # Calculate the total costs for each source and store them in the CostData object
+    for source in SOURCE_COSTS.keys():
+        cost_after = 0
+        if source in energy_after.energy_item:
+            cost_after = energy_after.energy_item[source] * SOURCE_COSTS[source]
+        cost_before = 0
+        if source in energy_before.energy_item:
+            cost_before = energy_before.energy_item[source] * SOURCE_COSTS[source]
+        annual_costs.cost_item[source] = (cost_after - cost_before) * k_year * 1e-6  # Convert the costs to billions of dollars per year
+    return annual_costs
