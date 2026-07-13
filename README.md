@@ -196,12 +196,12 @@ The costs are computed taking into account:
 | Source | Assumed Cost [$/MWh] | Description |
 |---|---|---|
 | Net Import | 96.05 | Average price of imported electricity |
-| Thermal | 58.47 | LCOE from large-scale thermoelectric plants (natural gas combined-cycle) |
-| Nuclear | 87.81 | LCOE from nuclear plants |
-| Photovoltaic | 40.38 | LCOE from large-scale photovoltaic plants |
-| Wind | 58.33 | LCOE from wind turbines (a mix of offshore and onshore installations) |
-| Storage | 35.30 | LCOS from a mix of hydro-pump systems and electrochemical batteries |
-|---|---|---|
+| Thermal | 58.47 | LCOE for large-scale thermoelectric plants (natural gas combined-cycle) |
+| Nuclear | 87.81 | LCOE for nuclear plants |
+| Photovoltaic | 40.38 | LCOE for large-scale photovoltaic plants |
+| Wind | 58.33 | LCOE for wind turbines (a mix of offshore and onshore installations) |
+| Storage | 35.30 | LCOS for a mix of hydro-pump systems and electrochemical batteries |
+||||
 
 <div align="center">
   <img src="Simulated_Scenario_Additional_Costs.png" alt="Immagine" width="500">
