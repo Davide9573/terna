@@ -185,7 +185,9 @@ The result is a new `PowerData` that shows the modified mix: reduced (or zeroed)
 
 ### Cost Computation
 
-The function computes the cost difference of the simulated scenario with respect to the current one. Generally, the simulated scenario entails additional costs due to increased photovoltaic, wind and (optional) nuclear power and, above all, increased storage capacity. On the other hand, savings are also achieved by reducing thermal energy production and net energy imports.
+The function computes the cost difference of the simulated scenario with respect to the real one.  
+Generally, the simulated scenario entails additional costs due to increased photovoltaic, wind and nuclear power and, above all, increased storage capacity.
+On the other hand, savings are also achieved by reducing thermal energy production and net energy imports.
 The costs are computed taking into account:
 - Levelized Costs of Electricity (LCOE) for the different power sources, from https://www.eia.gov/outlooks/aeo/electricity_generation/pdf/LCOE_report.pdf
 - Levelized Costs of Storage (LCOS), the counterpoart to LCOE, from https://www.pnnl.gov/projects/esgc-cost-performance/lcos-estimates
@@ -194,11 +196,11 @@ The costs are computed taking into account:
 | Source | Assumed Cost [$/MWh] | Description |
 |---|---|---|
 | Net Import | 96.05 | Average price of imported electricity |
-| Thermal | 58.47 | LCOE of utility thermal (natural gas combined-cycle) power |
-| Nuclear | 87.81 | LCOE |
-| Photovoltaic | 40.38 | LCOE of photovoltaic power |
-| Wind | 58.33 | LCOE of wind power |
-| Storage | 35.30 | LCOS of storage |
+| Thermal | 58.47 | LCOE from large-scale thermoelectric plants (natural gas combined-cycle) |
+| Nuclear | 87.81 | LCOE from nuclear plants |
+| Photovoltaic | 40.38 | LCOE from large-scale photovoltaic plants |
+| Wind | 58.33 | LCOE from wind turbines (a mix of offshore and onshore installations) |
+| Storage | 35.30 | LCOS from a mix of hydro-pump systems and electrochemical batteries |
 |---|---|---|
 
 <div align="center">
