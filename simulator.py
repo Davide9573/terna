@@ -1,4 +1,4 @@
-from turtle import pd
+import pandas as pd
 
 from parameters import ETA_CHARGE, ETA_DISCHARGE, NUCLEAR_BASE_LOAD_FACTOR
 from parameters import SOURCES, OTHER_POWER_ITEMS, SOURCE_COSTS
