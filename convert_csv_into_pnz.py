@@ -27,6 +27,8 @@ if __name__ == "__main__":
     for src, vec in gen_data.power_item.items():
         n_valid = int(np.sum(~np.isnan(vec)))
         print(f"  {src:<18}  {len(vec):>6} elements  ({n_valid} valid)")
+    print(f"Start date: {gen_data.start}")
+    print(f"End date: {gen_data.end}")
 
     print(f"Reading {IMP_PATH} ...")
     imp_data = load_import_export_data_from_csv(IMP_PATH)
@@ -34,6 +36,8 @@ if __name__ == "__main__":
     for src, vec in imp_data.power_item.items():
         n_valid = int(np.sum(~np.isnan(vec)))
         print(f"  {src:<18}  {len(vec):>6} elements  ({n_valid} valid)")
+    print(f"Start date: {imp_data.start}")
+    print(f"End date: {imp_data.end}")
 
     print(f"Reading {CONS_PATH} ...")
     cons_data = load_consumption_data_from_csv(CONS_PATH)
@@ -41,6 +45,8 @@ if __name__ == "__main__":
     for src, vec in cons_data.power_item.items():
         n_valid = int(np.sum(~np.isnan(vec)))
         print(f"  {src:<18}  {len(vec):>6} elements  ({n_valid} valid)")
+    print(f"Start date: {cons_data.start}")
+    print(f"End date: {cons_data.end}")
 
     print(f"Merge of the three dictionaries ...")
     data = utility.merge_power_data(gen_data, imp_data, cons_data)
@@ -48,6 +54,8 @@ if __name__ == "__main__":
     for src, vec in data.power_item.items():
         n_valid = int(np.sum(~np.isnan(vec)))
         print(f"  {src:<18}  {len(vec):>6} elements  ({n_valid} valid)")
+    print(f"Start date: {data.start}")
+    print(f"End date: {data.end}")
 
     save_power_data_to_npz(data, NPZ_PATH)
     size_kb = NPZ_PATH.stat().st_size / 1024
