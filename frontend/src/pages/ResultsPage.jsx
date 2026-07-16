@@ -83,7 +83,7 @@ export default function ResultsPage() {
             </section>
 
             <section className="results-section">
-              <h2>Costi incrementali annui dello scenario simulato</h2>
+              <h2>Costi annui dello scenario simulato aggiuntivi rispetto allo scenario attuale — 2025</h2>
               <CostTable costs={results.costs} />
             </section>
           </>
@@ -101,7 +101,7 @@ function CostTable({ costs }) {
         <thead>
           <tr>
             <th>Fonte / Voce</th>
-            <th>Costo incrementale (miliardi $/anno)</th>
+            <th>Costo aggiuntivo (miliardi $/anno)</th>
           </tr>
         </thead>
         <tbody>
