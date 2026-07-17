@@ -1,23 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
 import PowerChart from '../components/PowerChart'
 import SummaryTable from '../components/SummaryTable'
+import { useCurrentScenario } from '../contexts/ScenarioContext'
 
 const DEFAULTS = { max_capacity: 100, k_pv: 3, k_w: 2, nuke: true }
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const [currentScenario, setCurrentScenario] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    setLoading(true)
-    fetch('/api/current-scenario')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(data => { setCurrentScenario(data); setLoading(false) })
-      .catch(err => { setError(err.message); setLoading(false) })
-  }, [])
+  const { currentScenario, loading, error } = useCurrentScenario()
 
   return (
     <div className="page">
