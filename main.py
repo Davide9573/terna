@@ -16,7 +16,7 @@ if __name__ == "__main__":
     power_data = utility.load_power_data_from_npz(NPZ_PATH)
     # Plot and print the loaded data for consumption, generation and import/export
     title = f"Summary of power data loaded from {NPZ_PATH}"
-    # output_data(power_data, title)
+    output_data(power_data, title)
     
     # Simulate the production of electricity with surplus from photovoltaic, wind and storage
     max_capacity_=100
@@ -33,6 +33,5 @@ if __name__ == "__main__":
     output_data(simulated_data[0], title)
 
     # Compute and print the additional costs and of the simulated scenario compared to the original one
-    simulated_costs = simulator.simulate_costs(energy_before=utility.to_energy(power_data), energy_after=utility.to_energy(simulated_data[0]))
-    print(title)
-    utility.print_cost_data_summary(simulated_costs)
+    print("\nAdditional costs of the simulated scenario compared to the original one:")
+    utility.print_differential_costs(utility.to_energy(power_data), simulated_data[1])

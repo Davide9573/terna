@@ -53,8 +53,8 @@ export default function HomePage() {
           </p>
           <p>
             Sotto ancora sono presentati i risultati dello scenario di riferimento, basato sui dati ufficiali del 2025:<br />
-            - il grafico interattivo della distribuzione della potenza consumata, importata e generata, suddivisa per
-            fonte;<br />
+            - il grafico interattivo (in cui è possibile fare zoom e pan) della distribuzione della potenza consumata,
+            importata e generata, suddivisa per fonte;<br />
             - il prospetto tabulare, sempre suddiviso per fonte, dell'energia complessiva nel periodo di riferimento
             (il 2025), dei relativi costi livellati (LCOE/LCOS), e dei picchi di potenza.
           </p>

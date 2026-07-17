@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from parameters import SOURCE_COLORS, SOURCES, OTHER_POWER_ITEMS, OTHER_POWER_ITEM_COLORS
+from parameters import SOURCE_COLORS, SOURCE_COSTS, SOURCES, OTHER_POWER_ITEMS, OTHER_POWER_ITEM_COLORS
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -21,18 +21,10 @@ class PowerData:
 class EnergyData:
     """Data structure collecting:
     - energy production (per source), consumption and import/export data,
-    - duration of the time period considered."""
-    energy_item: dict[str, float] = field(default_factory=dict)  # energy values in TWh
-    duration: pd.Timedelta = pd.Timedelta("0h") # in hours
-
-@dataclass
-class CostData:
-    """Data structure collecting:
     - cost data for different energy sources,
     - duration of the time period considered."""
-    cost_item: dict[str, float] = field(default_factory=dict)  # cost values in bilions $
+    energy_item: dict[str, tuple[float, float]] = field(default_factory=dict)  # energy values in TWh, 
     duration: pd.Timedelta = pd.Timedelta("0h") # in hours
-
 
 def normalize_to_daylight_saving_time(df: pd.DataFrame) -> pd.DataFrame:
     """Express local Italian timestamps using a continuous UTC+02:00 reference."""
@@ -292,9 +284,9 @@ def compute_peaks(power_data: PowerData):
             total_power += np.nan_to_num(power_data.power_item[key], nan=0.0)
     power_data.power_item["Total Production"] = total_power
     # Compute the power curtailment across all sources for each time interval
-    curtailment_power = total_power.copy()  # Initialize curtailment power array
-    curtailment_power -= np.nan_to_num(power_data.power_item["Consumption"], nan=0.0)
-    power_data.power_item["Curtailment"] = curtailment_power
+    curtailed_power = total_power.copy()  # Initialize curtailment power array
+    curtailed_power -= np.nan_to_num(power_data.power_item["Consumption"], nan=0.0)
+    power_data.power_item["Curtailment"] = curtailed_power
     # Compute the peak power and corresponding time for each source and other power items
     for key in power_data.power_item.keys():
         power_peak = np.nanmax(power_data.power_item[key])
@@ -304,11 +296,20 @@ def compute_peaks(power_data: PowerData):
 
 def to_energy(power_data: PowerData) -> EnergyData:
     energy_data = EnergyData()
-    for key in power_data.power_item.keys():
-        energy_data.energy_item[key] = np.nansum(power_data.power_item[key]) / 4000  # Convert from GW to TWh, assuming 15-minute intervals
+    energy_data.duration = power_data.end - power_data.start
+    # Reparametrization factor to convert the costs to a solar year, based on the duration of the simulation, in hours
+    k_year = 365 / energy_data.duration.days if energy_data.duration.days > 0 else 0
+    for key in SOURCES:
+        energy_value = 0
+        if key in power_data.power_item:
+            energy_value = np.nansum(power_data.power_item[key]) / 4000  # Convert from GW to TWh, assuming 15-minute intervals
+        cost_value = energy_value * SOURCE_COSTS[key] * k_year * 1e-6  # Convert the costs to billions of dollars per year
+        energy_data.energy_item[key] = (energy_value, cost_value)
+    energy_data.energy_item["Total Production"] = (np.nansum([energy_data.energy_item[key][0] for key in SOURCES]) , np.nansum([energy_data.energy_item[key][1] for key in SOURCES]))
+    curtailed_energy = np.nansum(power_data.power_item["Curtailment"]) / 4000
+    energy_data.energy_item["Curtailment"] = (curtailed_energy, 0.0)  # Curtailment has no associated cost
     # sort the energy_item dictionary by energy values in descending order
-    energy_data.energy_item = {k: v for k, v in sorted(energy_data.energy_item.items(), key=lambda item: item[1], reverse=True)}
-    energy_data.duration=power_data.end - power_data.start
+    energy_data.energy_item = {k: v for k, v in sorted(energy_data.energy_item.items(), key=lambda item: item[1][0], reverse=True)}
     return energy_data
 
 
@@ -401,41 +402,50 @@ def print_power_data_summary(data: tuple[PowerData, EnergyData]) -> None:
     energy_data = data[1]
     # Print the table header
     print("-" * 93)
-    print(f"{'Source':<18} {'Energy (TWh)':>14} {'Power Peak (GW)':>16} {'Peak Time':>20}")
+    print(f"{'Source':<18} {'Energy (TWh)':>14} {'Cost (G€)':>14} {'Power Peak (GW)':>16} {'Peak Time':>20}")
 
     # Print the energy production, peak power, and corresponding time for each source
     print("-" * 93)
     for source in energy_data.energy_item.keys():
-        if source in SOURCES and energy_data.energy_item[source] > 0:
-                print(f"{source:<18} {energy_data.energy_item[source]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
+        if source in SOURCES and energy_data.energy_item[source][0] > 0:
+                print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
 
     # Print the total energy production (sum of all sources) and curtailment, including respective maximum power peaks and time
     print("-" * 93)
-    print(f"{'Total Production':<18} {energy_data.energy_item['Total Production']:>14.2f} {power_data.power_peaks['Total Production'][0]:>16.2f} {power_data.power_peaks['Total Production'][1]:>20}")
-    print(f"{'Curtailment':<18} {energy_data.energy_item['Curtailment']:>14.2f} {power_data.power_peaks['Curtailment'][0]:>16.2f} {power_data.power_peaks['Curtailment'][1]:>20}")
+    print(f"{'Total Production':<18} {energy_data.energy_item['Total Production'][0]:>14.2f} {energy_data.energy_item['Total Production'][1]:>14.2f} {power_data.power_peaks['Total Production'][0]:>16.2f} {power_data.power_peaks['Total Production'][1]:>20}")
+    print(f"{'Curtailment':<18} {energy_data.energy_item['Curtailment'][0]:>14.2f} {'---':>14} {power_data.power_peaks['Curtailment'][0]:>16.2f} {power_data.power_peaks['Curtailment'][1]:>20}")
 
     # Print the cumulative energy, the maximum peak, and the corresponding time, for each non-source power item
     print("-" * 93)
     for source in energy_data.energy_item.keys():
-        if source in OTHER_POWER_ITEMS and energy_data.energy_item[source] > 0:
-            print(f"{source:<18} {energy_data.energy_item[source]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
+        if source in OTHER_POWER_ITEMS and energy_data.energy_item[source][0] > 0:
+            print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
     print("-" * 93)
 
 
-def print_cost_data_summary(cost_data: CostData) -> None:
-    """Print a summary of the cost data to the console.
-    
+def print_differential_costs(data1: EnergyData, data2: EnergyData) -> None:
+    """Print a summary of the differential cost data to the console.
+
     Parameters
     ----------
-    cost_data : CostData
-        the cost data to print.
+    data1 : EnergyData
+        the energy data for the original scenario.
+    data2 : EnergyData
+        the energy data for the simulated scenario.
     """
 
     print("-" * 60)
-    print(f"{'Source':<18} {'Additional Cost (billions of $ per year)':>20}")
+    print(f"{'Source':<18} {'Additional Cost (G€)':>20}")
     print("-" * 60)
-    for source, cost in cost_data.cost_item.items():
-        print(f"{source:<18} {cost:>20.2f}")
+    total_diff = 0.0
+    for source in SOURCES:
+        diff = 0.0
+        if source in data1.energy_item:
+            diff -= data1.energy_item[source][1]
+        if source in data2.energy_item:
+            diff += data2.energy_item[source][1]
+        total_diff += diff
+        print(f"{source:<18} {diff:>20.2f}")
     print("-" * 60)
-    print(f"{'Total':<18} {sum(cost_data.cost_item.values()):>20.2f}")
+    print(f"{'Total':<18} {total_diff:>20.2f}")
     print("-" * 60)

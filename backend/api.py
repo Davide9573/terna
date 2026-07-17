@@ -100,7 +100,7 @@ PARAM_METADATA = {
     },
     "THERMAL_LCOE": {
         "label": "LCOE Termico",
-        "unit": "$/GWh",
+        "unit": "€/GWh",
         "description": (
             "Costo livellato dell'energia elettrica da fonti termoelettriche (gas naturale, carbone). "
             "Include costi di costruzione, esercizio e combustibile."
@@ -112,7 +112,7 @@ PARAM_METADATA = {
     },
     "PV_LCOE": {
         "label": "LCOE Fotovoltaico",
-        "unit": "$/GWh",
+        "unit": "€/GWh",
         "description": "Costo livellato dell'energia elettrica da impianti fotovoltaici utility-scale.",
         "rationale": (
             "Fonte: EIA Annual Energy Outlook. Il PV è attualmente la fonte di nuova generazione "
@@ -121,13 +121,13 @@ PARAM_METADATA = {
     },
     "WIND_LCOE": {
         "label": "LCOE Eolico",
-        "unit": "$/GWh",
+        "unit": "€/GWh",
         "description": "Costo livellato dell'energia elettrica da impianti eolici onshore.",
         "rationale": "Fonte: EIA Annual Energy Outlook.",
     },
     "NUKE_LCOE": {
         "label": "LCOE Nucleare",
-        "unit": "$/GWh",
+        "unit": "€/GWh",
         "description": (
             "Costo livellato dell'energia elettrica da impianti nucleari. "
             "Include costi di costruzione (elevati), esercizio, combustibile e smaltimento rifiuti."
@@ -139,7 +139,7 @@ PARAM_METADATA = {
     },
     "LCOS": {
         "label": "LCOS – Costo livellato dell'accumulo",
-        "unit": "$/GWh",
+        "unit": "€/GWh",
         "description": (
             "Costo livellato dello stoccaggio energetico (Levelized Cost of Storage). "
             "Rappresenta il costo per ogni GWh immagazzinato e rilasciato nel ciclo di vita del sistema."
@@ -152,7 +152,7 @@ PARAM_METADATA = {
     },
     "IMPORT_COST": {
         "label": "Costo medio importazione elettrica",
-        "unit": "$/GWh",
+        "unit": "€/GWh",
         "description": "Prezzo medio pagato dall'Italia per l'elettricità importata dall'estero.",
         "rationale": (
             "Fonte: World Bank WITS Comtrade data, media 2024 sulle importazioni italiane "
@@ -192,7 +192,21 @@ def _power_data_to_dict(data: PowerData) -> dict:
 
 
 def _energy_to_dict(energy: EnergyData) -> dict:
-    return {k: float(v) for k, v in energy.energy_item.items()}
+    return {
+        key: {"energy": float(energy_value), "cost": float(cost_value)}
+        for key, (energy_value, cost_value) in energy.energy_item.items()
+    }
+
+
+def _differential_costs(before: EnergyData, after: EnergyData) -> dict[str, float]:
+    """Return annual cost changes by source from the two energy summaries."""
+    sources = {**before.energy_item, **after.energy_item}
+    return {
+        source: after.energy_item.get(source, (0.0, 0.0))[1]
+        - before.energy_item.get(source, (0.0, 0.0))[1]
+        for source in sources
+        if source not in {"Total Production", "Curtailment"}
+    }
 
 
 def _get_power_data_copy() -> PowerData:
@@ -282,11 +296,6 @@ def run_simulation(req: SimulationRequest):
         nuke=req.nuke,
     )
 
-    costs = sim_module.simulate_costs(
-        energy_before=energy_before,
-        energy_after=energy_after,
-    )
-
     return {
         "before": {
             "chart": _power_data_to_dict(power_data),
@@ -296,5 +305,5 @@ def run_simulation(req: SimulationRequest):
             "chart": _power_data_to_dict(power_after),
             "energy": _energy_to_dict(energy_after),
         },
-        "costs": {k: float(v) for k, v in costs.cost_item.items()},
+        "costs": _differential_costs(energy_before, energy_after),
     }

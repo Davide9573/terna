@@ -38,6 +38,9 @@ export default function ResultsPage() {
 
       <main className="content">
         <div className="actions-row">
+          <button className="btn btn-secondary" onClick={() => navigate('/simulation')}>
+            ← Modifica i parametri della simulazione
+          </button>
           <button className="btn btn-secondary" onClick={() => navigate('/')}>
             ← Torna alla pagina principale
           </button>
@@ -89,7 +92,7 @@ function CostTable({ costs }) {
         <thead>
           <tr>
             <th>Fonte / Voce</th>
-            <th>Costo aggiuntivo (miliardi $/anno)</th>
+            <th>Costo aggiuntivo (G€/anno)</th>
           </tr>
         </thead>
         <tbody>
