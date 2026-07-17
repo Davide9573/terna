@@ -231,6 +231,19 @@ class SimulationRequest(BaseModel):
     nuke: bool = True
 
 
+@app.get("/api/current-scenario")
+def get_current_scenario():
+    _apply_config()
+    power_data = load_power_data_from_npz(NPZ_PATH)
+    compute_peaks(power_data)
+    energy = to_energy(power_data)
+    
+    return {
+        "chart": _power_data_to_dict(power_data),
+        "energy": _energy_to_dict(energy),
+    }
+
+
 @app.post("/api/simulate")
 def run_simulation(req: SimulationRequest):
     _apply_config()

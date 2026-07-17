@@ -70,6 +70,16 @@ export default function ConfigPage() {
           </button>
         </div>
 
+        {/* Explanation */}
+        <div className="card">
+          <h2>Come usare lo strumento</h2>
+          <p>
+            La tabella seguente consente di consultare e modificare i parametri fisici ed economici del modello
+            (rendimenti di carica e scarica degli accumuli, costi livellati dell'energia LCOE/LCOS, costo
+            dell'importazione).
+          </p>
+        </div>
+
         <div className="config-table-wrapper">
           <table className="config-table">
             <thead>

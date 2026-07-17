@@ -59,18 +59,6 @@ export default function ResultsPage() {
         {results && (
           <>
             <section className="results-section">
-              <h2>Scenario attuale — 2025</h2>
-              <PowerChart
-                chartData={results.before.chart}
-                title="Bilancio energetico 2025 — Scenario attuale"
-              />
-              <SummaryTable
-                energy={results.before.energy}
-                peaks={results.before.chart.peaks}
-              />
-            </section>
-
-            <section className="results-section">
               <h2>Scenario simulato</h2>
               <PowerChart
                 chartData={results.after.chart}

@@ -2,6 +2,8 @@
 import HomePage from './pages/HomePage'
 import ConfigPage from './pages/ConfigPage'
 import ResultsPage from './pages/ResultsPage'
+import SimulationPage from './pages/SimulationPage'
+import CostAnalysisPage from './pages/CostAnalysisPage'
 
 export default function App() {
   return (
@@ -10,6 +12,8 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/config" element={<ConfigPage />} />
         <Route path="/results" element={<ResultsPage />} />
+        <Route path="/simulation" element={<SimulationPage />} />
+        <Route path="/cost-analysis" element={<CostAnalysisPage />} />
       </Routes>
     </BrowserRouter>
   )
