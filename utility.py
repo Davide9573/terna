@@ -34,6 +34,40 @@ class CostData:
     duration: pd.Timedelta = pd.Timedelta("0h") # in hours
 
 
+def normalize_to_daylight_saving_time(df: pd.DataFrame) -> pd.DataFrame:
+    """Express local Italian timestamps using a continuous UTC+02:00 reference."""
+    sample_key = next((column for column in ("Source", "Country") if column in df), None)
+    if sample_key is None:
+        sample_occurrence = df.groupby("Date", sort=False).cumcount()
+    else:
+        sample_occurrence = df.groupby(["Date", sample_key], sort=False).cumcount()
+
+    sample_times = pd.DataFrame(
+        {"Date": df["Date"], "occurrence": sample_occurrence}
+    ).drop_duplicates()
+    is_descending = df["Date"].iloc[0] > df["Date"].iloc[-1]
+    is_daylight_saving_occurrence = (
+        sample_times["occurrence"].gt(0)
+        if is_descending
+        else sample_times["occurrence"].eq(0)
+    )
+    daylight_saving_times = (
+        sample_times["Date"].dt.tz_localize(
+            "Europe/Rome", ambiguous=is_daylight_saving_occurrence.to_numpy()
+        )
+        .dt.tz_convert("UTC")
+        .dt.tz_localize(None)
+        + pd.Timedelta(hours=2)
+    )
+    daylight_saving_by_sample = pd.Series(
+        daylight_saving_times.to_numpy(),
+        index=pd.MultiIndex.from_frame(sample_times),
+    )
+    row_samples = pd.MultiIndex.from_arrays([df["Date"], sample_occurrence])
+    df["Date"] = daylight_saving_by_sample.reindex(row_samples).to_numpy()
+    return df
+
+
 def load_generation_data_from_csv(csv_path: Path) -> PowerData:
     """
     Read the CSV and return (dictionary { source: np.ndarray }, start timestamp).
@@ -50,6 +84,7 @@ def load_generation_data_from_csv(csv_path: Path) -> PowerData:
     df = df[df["Date"].str.match(r"\d{2}/\d{2}/\d{4}", na=False)].copy()
     df["Generation"] = pd.to_numeric(df["Generation"], errors="coerce")
     df["Date"] = pd.to_datetime(df["Date"], dayfirst=True, format="%d/%m/%Y %H:%M:%S")
+    df = normalize_to_daylight_saving_time(df)
     df.sort_values("Date", inplace=True)
 
     sources = df["Source"].dropna().unique().tolist()
@@ -88,6 +123,7 @@ def load_consumption_data_from_csv(csv_path: Path) -> PowerData:
     df = df[df["Date"].str.match(r"\d{2}/\d{2}/\d{4}", na=False)].copy()
     df["Consumption"] = pd.to_numeric(df["Consumption"], errors="coerce")
     df["Date"] = pd.to_datetime(df["Date"], dayfirst=True, format="%d/%m/%Y %H:%M:%S")
+    df = normalize_to_daylight_saving_time(df)
     df.sort_values("Date", inplace=True)
 
     # Temporal Index derived from the actual data range
@@ -123,6 +159,7 @@ def load_import_export_data_from_csv(csv_path: Path) -> PowerData:
     df["Import"] = pd.to_numeric(df["Import"], errors="coerce")
     df["Export"] = pd.to_numeric(df["Export"], errors="coerce")
     df["Date"] = pd.to_datetime(df["Date"], dayfirst=True, format="%d/%m/%Y %H:%M:%S")
+    df = normalize_to_daylight_saving_time(df)
     df.sort_values("Date", inplace=True)
 
     # Temporal Index derived from the actual data range
