@@ -35,7 +35,7 @@ export default function HomePage() {
             Questo strumento è pensato per simulare l'effetto di differenti combinazioni del mix di fonti
             sul bilancio energetico italiano, a partire da dati reali, ovvero i valori di produzione, consumo e
             scambio con l'estero dell'anno <strong>2025</strong>.
-            I dati sono quelli ufficiali, esatrtti dal sito web di <strong>TERNA</strong>, il gestore della rete
+            I dati sono quelli ufficiali, estratti dal sito web di <strong>TERNA</strong>, il gestore della rete
             di trasmissione nazionale (<a href="https://www.terna.it" target="_blank" rel="noopener noreferrer">www.terna.it</a>).<br />
           </p>
           <p>
@@ -62,11 +62,11 @@ export default function HomePage() {
             - esplorare lo spazio degli scenari "a emissioni zero", confrontandone i costi.<br />
           </p>
           <p>
-            Sotto ancora sono presentati i risultati dello scenario di riferimento, basato sui dati reali del 2025,
-            in termini di:<br />
-            - il grafico interattivo della distribuzione della potenza consumata, importata e generata, suddivisa per fonte;<br />
-            - il prospetto tabulare dell'energia complessiva, dei relativi costi livellati (LCOE/LCOS)
-            nel periodo di riferimento (il 2025), e dei picchi di potenza, sempre suddivisi per fonte.
+            Sotto ancora sono presentati i risultati dello scenario di riferimento, basato sui dati ufficiali del 2025:<br />
+            - il grafico interattivo della distribuzione della potenza consumata, importata e generata, suddivisa per
+            fonte;<br />
+            - il prospetto tabulare, sempre suddiviso per fonte, dell'energia complessiva nel periodo di riferimento
+            (il 2025), dei relativi costi livellati (LCOE/LCOS), e dei picchi di potenza.
           </p>
         </div>
 
@@ -86,7 +86,7 @@ export default function HomePage() {
         {loading && (
           <div className="loading-box">
             <div className="spinner" />
-            <p>Caricamento dello scenario di riferimento (dati reali 2025)…</p>
+            <p>Caricamento dello scenario di riferimento (dati ufficiali 2025)…</p>
           </div>
         )}
 

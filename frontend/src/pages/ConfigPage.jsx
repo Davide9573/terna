@@ -72,11 +72,14 @@ export default function ConfigPage() {
 
         {/* Explanation */}
         <div className="card">
-          <h2>Come usare lo strumento</h2>
+          <h2>Indicazioni</h2>
           <p>
-            La tabella seguente consente di consultare e modificare i parametri fisici ed economici del modello
-            (rendimenti di carica e scarica degli accumuli, costi livellati dell'energia LCOE/LCOS, costo
-            dell'importazione).
+            La tabella seguente consente di consultare e modificare i parametri fisici ed economici del modello:
+            i rendimenti di carica e scarica degli accumuli, i costi livellati dell'energia LCOE/LCOS, e il costo
+            dell'importazione.
+            Per ogni parametro è riportata la ratio della scelta dei valori di default e/o la fonte dei dati.<br />
+            Questa pagina consente all'utente di modificare i parametri a proprio piacimento, rifacendosi a fonti proprie.
+            L'alterazione di questi parametri <strong>non</strong> garantisce che le simulazioni siano realistiche.
           </p>
         </div>
 

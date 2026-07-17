@@ -25,6 +25,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Power data (loaded once at startup) ───────────────────────────────────────
+_power_data_2025: PowerData | None = None
+
+@app.on_event("startup")
+async def _load_power_data():
+    """Load power data from NPZ file once at application startup."""
+    global _power_data_2025
+    _power_data_2025 = load_power_data_from_npz(NPZ_PATH)
+    print(f"✓ Power data (2025) loaded from {NPZ_PATH}")
+
 # ── Immutable defaults (captured once at startup) ─────────────────────────────
 _DEFAULTS: dict[str, float] = {
     "ETA_CHARGE":               params_module.ETA_CHARGE,
@@ -185,6 +195,19 @@ def _energy_to_dict(energy: EnergyData) -> dict:
     return {k: float(v) for k, v in energy.energy_item.items()}
 
 
+def _get_power_data_copy() -> PowerData:
+    """Return a shallow copy of the preloaded power data with fresh numpy array copies for power_item."""
+    if _power_data_2025 is None:
+        raise RuntimeError("Power data not yet loaded. Application startup may not have completed.")
+    # Create a shallow copy of the PowerData but with deep copies of the arrays
+    return PowerData(
+        power_item={k: v.copy() for k, v in _power_data_2025.power_item.items()},
+        power_peaks={},  # Will be recalculated
+        start=_power_data_2025.start,
+        end=_power_data_2025.end,
+    )
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/parameters")
@@ -234,7 +257,7 @@ class SimulationRequest(BaseModel):
 @app.get("/api/current-scenario")
 def get_current_scenario():
     _apply_config()
-    power_data = load_power_data_from_npz(NPZ_PATH)
+    power_data = _get_power_data_copy()
     compute_peaks(power_data)
     energy = to_energy(power_data)
     
@@ -247,7 +270,7 @@ def get_current_scenario():
 @app.post("/api/simulate")
 def run_simulation(req: SimulationRequest):
     _apply_config()
-    power_data = load_power_data_from_npz(NPZ_PATH)
+    power_data = _get_power_data_copy()
     compute_peaks(power_data)
     energy_before = to_energy(power_data)
 
