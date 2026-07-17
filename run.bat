@@ -35,10 +35,17 @@ timeout /t 3 /nobreak >nul
 echo [2/2] Avvio frontend Vite su http://localhost:5173 ...
 start "TERNA Frontend" cmd /k "cd /d %FRONTEND_DIR% && npm run dev"
 
+:: Attesa per dare tempo al frontend di avviarsi completamente
+timeout /t 4 /nobreak >nul
+
+echo [3/3] Apertura del browser a http://localhost:5174/ ...
+start http://localhost:5174/
+
 echo.
 echo Entrambi i server sono stati avviati in finestre separate.
 echo   Backend:  http://localhost:8000
 echo   Frontend: http://localhost:5173
+echo   Browser:  http://localhost:5174/
 echo   API docs: http://localhost:8000/docs
 echo.
 echo Chiudere le rispettive finestre per fermare i server.
