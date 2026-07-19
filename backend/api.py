@@ -403,7 +403,12 @@ if _FRONTEND_DIST.exists():
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         """Serve individual static files or fall back to index.html for client-side routing."""
-        candidate = _FRONTEND_DIST / full_path
+        candidate = (_FRONTEND_DIST / full_path).resolve()
+        try:
+            candidate.relative_to(_FRONTEND_DIST.resolve())
+        except ValueError:
+            # Path escapes the frontend dist directory — serve index.html instead
+            return FileResponse(str(_FRONTEND_DIST / "index.html"))
         if candidate.is_file():
             return FileResponse(str(candidate))
         return FileResponse(str(_FRONTEND_DIST / "index.html"))
