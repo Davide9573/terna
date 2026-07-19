@@ -249,3 +249,97 @@ The costs are computed taking into account:
 
   Summary of simulated scenario differential costs.
 </div>
+
+---
+
+## Home Lab Deployment (Docker + Nginx Proxy Manager)
+
+This repository uses a single Docker image/container that serves:
+- FastAPI API routes (`/api/*`)
+- the built React frontend from the same origin
+
+The app is published on host port `TERNA_PORT` (default `5150`) and listens on container port `8080`.
+
+### Files added for deployment
+
+- `docker-compose.yml`
+- `Dockerfile`
+- `requirements.txt`
+- `.env`
+
+### 1. Configure environment
+
+This repository uses a single committed `.env` file.
+
+Edit `.env` and set:
+- `TERNA_PORT`: host port to expose the webapp (default `5150`)
+- `CORS_ALLOW_ORIGINS`: public URL(s), for example `https://terna.masciotta.casa`
+- `RATE_LIMIT_REQUESTS`: max API requests per client IP in the configured time window
+- `RATE_LIMIT_WINDOW_SECONDS`: rate-limit window duration in seconds
+
+### 2. Build and start
+
+```bash
+docker compose up -d --build
+```
+
+Check status:
+
+```bash
+docker compose ps
+```
+
+Open locally:
+
+```text
+http://<docker-host-ip>:5150
+```
+
+### 3. Configure Nginx Proxy Manager (NPM)
+
+In NPM, create a new **Proxy Host**:
+
+- Domain Names: `terna.masciotta.casa`
+- Scheme: `http`
+- Forward Hostname / IP: Docker host IP (or hostname)
+- Forward Port: `5150` (or your `TERNA_PORT`)
+- Websockets Support: enabled
+- Block Common Exploits: enabled
+
+Then in the **SSL** tab:
+
+- Request a new Let's Encrypt certificate
+- Force SSL: enabled
+- HTTP/2 Support: enabled
+
+Because API and frontend are served by the same container and same public domain, browser calls to `/api` work without additional proxy rules.
+
+### Public access and abuse controls
+
+This app is intentionally public (no login). Hardening is applied with:
+- backend request rate-limiting per client IP (configured in `.env`)
+- strict input validation on simulation and parameter updates
+- backend container running as non-root with reduced privileges
+- security headers at frontend nginx level
+
+### 4. Update flow
+
+When new code is pulled:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+### 5. Logs and troubleshooting
+
+```bash
+docker compose logs -f terna
+```
+
+If the backend fails at startup, verify CSV files are present in repo root:
+- `power_generation_2025.csv`
+- `power_imp_exp_2025.csv`
+- `power_consumption_2025.csv`
+
+The backend image generates `power_2025.npz` during the Docker build.

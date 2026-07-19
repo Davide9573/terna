@@ -1,0 +1,17 @@
+services:
+  terna:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: terna
+    restart: unless-stopped
+    ports:
+      - "${TERNA_PORT}:8080"
+    environment:
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
