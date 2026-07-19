@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 import parameters as params_module
@@ -384,3 +385,14 @@ def run_simulation(req: SimulationRequest):
         },
         "costs": _differential_costs(energy_before, energy_after),
     }
+
+
+# Static frontend (production)
+_FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if _FRONTEND_DIST.exists():
+    app.mount(
+        "/",
+        StaticFiles(directory=str(_FRONTEND_DIST), html=True),
+        name="frontend",
+    )

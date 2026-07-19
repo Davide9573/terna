@@ -1,10 +1,12 @@
 services:
-  backend:
+  terna:
     build:
       context: .
-      dockerfile: backend/Dockerfile
-    container_name: terna-backend
+      dockerfile: Dockerfile
+    container_name: terna
     restart: unless-stopped
+    ports:
+      - "${TERNA_PORT}:8080"
     environment:
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
       RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS}
@@ -13,16 +15,3 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: terna-frontend
-    restart: unless-stopped
-    ports:
-      - "${TERNA_PORT}:80"
-    security_opt:
-      - no-new-privileges:true
-    depends_on:
-      - backend

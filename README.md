@@ -29,7 +29,7 @@ source .venv/bin/activate
 ### Install dependencies
 
 ```bash
-pip install numpy pandas matplotlib
+pip install -r requirements.txt
 ```
 
 ## Code execution
@@ -213,20 +213,17 @@ The costs are computed taking into account:
 
 ## Home Lab Deployment (Docker + Nginx Proxy Manager)
 
-This repository now includes a production deployment stack with:
-- a FastAPI backend container (`backend`, internal port 8000)
-- a React frontend container (`frontend`, internal port 80)
-- frontend Nginx reverse-proxying `/api/*` to the backend
+This repository uses a single Docker image/container that serves:
+- FastAPI API routes (`/api/*`)
+- the built React frontend from the same origin
 
-Only the frontend is published on the host (`TERNA_PORT`, default `5150`).
+The app is published on host port `TERNA_PORT` (default `5150`) and listens on container port `8080`.
 
 ### Files added for deployment
 
 - `docker-compose.yml`
-- `backend/Dockerfile`
-- `backend/requirements.txt`
-- `frontend/Dockerfile`
-- `frontend/nginx.conf`
+- `Dockerfile`
+- `requirements.txt`
 - `.env`
 
 ### 1. Configure environment
@@ -274,7 +271,7 @@ Then in the **SSL** tab:
 - Force SSL: enabled
 - HTTP/2 Support: enabled
 
-Because frontend and backend are served under the same public domain, browser calls to `/api` work without changing frontend code.
+Because API and frontend are served by the same container and same public domain, browser calls to `/api` work without additional proxy rules.
 
 ### Public access and abuse controls
 
@@ -296,8 +293,7 @@ docker compose up -d --build
 ### 5. Logs and troubleshooting
 
 ```bash
-docker compose logs -f frontend
-docker compose logs -f backend
+docker compose logs -f terna
 ```
 
 If the backend fails at startup, verify CSV files are present in repo root:
