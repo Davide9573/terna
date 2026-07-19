@@ -390,8 +390,14 @@ def run_simulation(req: SimulationRequest):
 # ── Static frontend (production) ──────────────────────────────────────────────
 # When the React app has been built (frontend/dist exists), serve it from the
 # same origin as the API so no CORS or proxy configuration is needed.
-# StaticFiles with html=True serves every file in the dist directory and
-# returns index.html for any path that does not match a real file, which is
+#
+# IMPORTANT: this mount MUST stay at the end of the file, after all API routes
+# are registered.  Starlette evaluates routes in definition order, so the
+# explicit /api/* routes take priority and the static-files mount is only
+# reached for paths that no API route matches.
+#
+# StaticFiles with html=True serves every file in the dist directory and falls
+# back to index.html for any path that does not match a real file, which is
 # exactly what a React SPA needs for client-side routing.
 # No user-supplied path is used to construct filesystem paths, so there is no
 # path-traversal risk.
