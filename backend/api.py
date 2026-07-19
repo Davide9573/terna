@@ -13,7 +13,8 @@ import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 import parameters as params_module
@@ -384,3 +385,28 @@ def run_simulation(req: SimulationRequest):
         },
         "costs": _differential_costs(energy_before, energy_after),
     }
+
+
+# ── Static frontend (production) ──────────────────────────────────────────────
+# When the React app has been built (frontend/dist exists), serve it from the
+# same origin as the API so no CORS or proxy configuration is needed.
+#
+# IMPORTANT: this mount MUST stay at the end of the file, after all API routes
+# are registered.  Starlette evaluates routes in definition order, so the
+# explicit /api/* routes take priority and the static-files mount is only
+# reached for paths that no API route matches.
+#
+# StaticFiles with html=True serves every file in the dist directory and falls
+# back to index.html for any path that does not match a real file, which is
+# exactly what a React SPA needs for client-side routing.
+# No user-supplied path is used to construct filesystem paths, so there is no
+# path-traversal risk.
+
+_FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if _FRONTEND_DIST.exists():
+    app.mount(
+        "/",
+        StaticFiles(directory=str(_FRONTEND_DIST), html=True),
+        name="frontend",
+    )
