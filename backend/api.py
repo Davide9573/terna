@@ -1,5 +1,9 @@
 import sys
 from pathlib import Path
+import os
+import math
+import time
+from collections import defaultdict, deque
 
 # Make the parent directory (project root) importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -7,8 +11,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 import numpy as np
 from fastapi import FastAPI, HTTPException
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
 
 import parameters as params_module
 import simulator as sim_module
@@ -18,10 +24,17 @@ NPZ_PATH = Path(__file__).parent.parent / "power_2025.npz"
 
 app = FastAPI(title="Terna Energy Simulator API")
 
+_cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "*")
+_cors_origins = [origin.strip() for origin in _cors_origins_raw.split(",") if origin.strip()]
+
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "120"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+_rate_buckets: dict[str, deque[float]] = defaultdict(deque)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=_cors_origins,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -164,6 +177,50 @@ PARAM_METADATA = {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+_PARAM_BOUNDS: dict[str, tuple[float, float]] = {
+    "ETA_CHARGE": (0.0, 1.0),
+    "ETA_DISCHARGE": (0.0, 1.0),
+    "NUCLEAR_BASE_LOAD_FACTOR": (0.0, 1.0),
+    "THERMAL_LCOE": (0.0, 2_000_000.0),
+    "PV_LCOE": (0.0, 2_000_000.0),
+    "WIND_LCOE": (0.0, 2_000_000.0),
+    "NUKE_LCOE": (0.0, 2_000_000.0),
+    "LCOS": (0.0, 2_000_000.0),
+    "IMPORT_COST": (0.0, 2_000_000.0),
+}
+
+
+def _get_client_ip(request: Request) -> str:
+    # We trust headers injected by our internal Nginx container.
+    real_ip = request.headers.get("x-real-ip", "").strip()
+    if real_ip:
+        return real_ip
+    xff = request.headers.get("x-forwarded-for", "").strip()
+    if xff:
+        return xff.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if request.url.path.startswith("/api/"):
+        ip = _get_client_ip(request)
+        now = time.time()
+        bucket = _rate_buckets[ip]
+        while bucket and now - bucket[0] > RATE_LIMIT_WINDOW_SECONDS:
+            bucket.popleft()
+        if len(bucket) >= RATE_LIMIT_REQUESTS:
+            retry_after = max(1, int(RATE_LIMIT_WINDOW_SECONDS - (now - bucket[0])))
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests. Please retry later."},
+                headers={"Retry-After": str(retry_after)},
+            )
+        bucket.append(now)
+    return await call_next(request)
+
 def _apply_config() -> None:
     """Push current _config values into both params_module and sim_module namespaces."""
     for key, value in _config.items():
@@ -244,11 +301,24 @@ class ParameterUpdate(BaseModel):
     key: str
     value: float
 
+    @field_validator("value")
+    @classmethod
+    def value_must_be_finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("Value must be a finite number.")
+        return v
+
 
 @app.patch("/api/parameters")
 def update_parameter(update: ParameterUpdate):
     if update.key not in _config:
         raise HTTPException(status_code=404, detail=f"Parameter '{update.key}' not found.")
+    min_v, max_v = _PARAM_BOUNDS[update.key]
+    if not (min_v <= update.value <= max_v):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Parameter '{update.key}' out of range: expected [{min_v}, {max_v}].",
+        )
     _config[update.key] = update.value
     _apply_config()
     return {"key": update.key, "value": _config[update.key]}
@@ -262,10 +332,17 @@ def reset_parameters():
 
 
 class SimulationRequest(BaseModel):
-    max_capacity: float = 100.0
-    k_pv: float = 3.0
-    k_w: float = 2.0
+    max_capacity: float = Field(default=100.0, ge=0.0, le=5_000.0)
+    k_pv: float = Field(default=3.0, ge=0.0, le=20.0)
+    k_w: float = Field(default=2.0, ge=0.0, le=20.0)
     nuke: bool = True
+
+    @field_validator("max_capacity", "k_pv", "k_w")
+    @classmethod
+    def numeric_fields_must_be_finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("Numeric field must be finite.")
+        return v
 
 
 @app.get("/api/current-scenario")
