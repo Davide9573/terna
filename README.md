@@ -7,48 +7,76 @@ This project analyzes and visualizes the Italian electricity budget over a speci
 
 ---
 
-## Cloud Deployment
+## Deployment
 
-The webapp (FastAPI backend + React frontend) can be published for free on [Render.com](https://render.com) in a single step.
+The webapp is designed around a single entry point in production:
+- FastAPI serves all API routes under `/api/*`
+- the built React app is served by the same process and same origin
 
-### Option A — Render.com (recommended, free tier)
+This means both cloud and homelab setups use one public URL and one exposed port.
 
-Render provides free HTTPS web services.  Free-tier instances spin down after ~15 min of inactivity and take about 30 s to cold-start on the next request — acceptable for a demo or educational app.
+### Option A — Cloud on Render.com
+
+Render provides managed HTTPS and can deploy this repository directly from `render.yaml`.
 
 1. Fork (or push) this repository to your GitHub account.
-2. Go to [dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**.
-3. Connect your repository.  Render will detect `render.yaml` automatically.
-4. Click **Apply** — Render will build and start the service.
-5. Your app will be available at `https://<service-name>.onrender.com` with HTTPS out of the box.
+2. Open [dashboard.render.com](https://dashboard.render.com) and create a new **Blueprint** service.
+3. Select this repository. Render auto-detects `render.yaml`.
+4. Click **Apply** to build and deploy.
+5. Open `https://<service-name>.onrender.com` once deployment is complete.
 
-The `render.yaml` blueprint at the root of the repository tells Render to:
-- Install Python dependencies.
-- Build the React frontend (`npm ci && npm run build`).
-- Regenerate `power_2025.npz` from the bundled CSV files.
-- Start the FastAPI server with `uvicorn`.
+What Render runs on each deploy:
+- install Python dependencies from `requirements.txt`
+- build frontend assets with `npm ci && npm run build`
+- regenerate `power_2025.npz` from CSV files
+- start FastAPI with `uvicorn backend.api:app --host 0.0.0.0 --port $PORT`
 
-### Option B — Docker (Fly.io, Railway, any container platform)
+Notes:
+- Render free tier spins down after inactivity and may cold-start in about 30 seconds.
+- API and frontend are same-origin in this setup, so no separate frontend service is required.
 
-A `Dockerfile` is provided for platforms that run containers.
+### Option B — Homelab with Docker Compose + Nginx Proxy Manager
+
+Use this when self-hosting on your own machine or NAS.
+
+1. Review `.env`:
+  - `TERNA_PORT` (host port, default `5150`)
+  - `CORS_ALLOW_ORIGINS` (public URL, for example `https://terna.masciotta.casa`)
+  - `RATE_LIMIT_REQUESTS` and `RATE_LIMIT_WINDOW_SECONDS`
+2. Build and start:
 
 ```bash
-# Build
-docker build -t terna .
-
-# Run locally
-docker run -p 8080:8080 terna
+docker compose up -d --build
 ```
 
-The container listens on port `8080` by default.  To deploy on **Fly.io** (free hobby plan):
+3. Verify service:
 
 ```bash
-fly launch   # follow the prompts, select the free plan
-fly deploy
+docker compose ps
+docker compose logs -f terna
 ```
+
+4. Access locally at `http://<docker-host-ip>:5150` (or your configured `TERNA_PORT`).
+
+5. In Nginx Proxy Manager, create a Proxy Host:
+  - Domain Names: your public domain (for example `terna.masciotta.casa`)
+  - Scheme: `http`
+  - Forward Hostname/IP: Docker host
+  - Forward Port: `TERNA_PORT` value (default `5150`)
+  - Websockets Support: enabled
+  - Block Common Exploits: enabled
+  - SSL: Let's Encrypt certificate + Force SSL
+
+Notes:
+- The container listens on internal port `8080`; Compose maps it to `TERNA_PORT`.
+- API and frontend are served from the same container and domain, so `/api` works without extra proxy rules.
+- Runtime hardening in Compose includes `cap_drop: [ALL]` and `no-new-privileges:true`.
 
 ---
 
-## Environment Setup
+## Local Environment Setup
+
+To develop locally on Windows, follow these steps to set up a Python virtual environment and install dependencies.
 
 ### Prerequisites
 
@@ -251,95 +279,3 @@ The costs are computed taking into account:
 </div>
 
 ---
-
-## Home Lab Deployment (Docker + Nginx Proxy Manager)
-
-This repository uses a single Docker image/container that serves:
-- FastAPI API routes (`/api/*`)
-- the built React frontend from the same origin
-
-The app is published on host port `TERNA_PORT` (default `5150`) and listens on container port `8080`.
-
-### Files added for deployment
-
-- `docker-compose.yml`
-- `Dockerfile`
-- `requirements.txt`
-- `.env`
-
-### 1. Configure environment
-
-This repository uses a single committed `.env` file.
-
-Edit `.env` and set:
-- `TERNA_PORT`: host port to expose the webapp (default `5150`)
-- `CORS_ALLOW_ORIGINS`: public URL(s), for example `https://terna.masciotta.casa`
-- `RATE_LIMIT_REQUESTS`: max API requests per client IP in the configured time window
-- `RATE_LIMIT_WINDOW_SECONDS`: rate-limit window duration in seconds
-
-### 2. Build and start
-
-```bash
-docker compose up -d --build
-```
-
-Check status:
-
-```bash
-docker compose ps
-```
-
-Open locally:
-
-```text
-http://<docker-host-ip>:5150
-```
-
-### 3. Configure Nginx Proxy Manager (NPM)
-
-In NPM, create a new **Proxy Host**:
-
-- Domain Names: `terna.masciotta.casa`
-- Scheme: `http`
-- Forward Hostname / IP: Docker host IP (or hostname)
-- Forward Port: `5150` (or your `TERNA_PORT`)
-- Websockets Support: enabled
-- Block Common Exploits: enabled
-
-Then in the **SSL** tab:
-
-- Request a new Let's Encrypt certificate
-- Force SSL: enabled
-- HTTP/2 Support: enabled
-
-Because API and frontend are served by the same container and same public domain, browser calls to `/api` work without additional proxy rules.
-
-### Public access and abuse controls
-
-This app is intentionally public (no login). Hardening is applied with:
-- backend request rate-limiting per client IP (configured in `.env`)
-- strict input validation on simulation and parameter updates
-- backend container running as non-root with reduced privileges
-- security headers at frontend nginx level
-
-### 4. Update flow
-
-When new code is pulled:
-
-```bash
-git pull
-docker compose up -d --build
-```
-
-### 5. Logs and troubleshooting
-
-```bash
-docker compose logs -f terna
-```
-
-If the backend fails at startup, verify CSV files are present in repo root:
-- `power_generation_2025.csv`
-- `power_imp_exp_2025.csv`
-- `power_consumption_2025.csv`
-
-The backend image generates `power_2025.npz` during the Docker build.
