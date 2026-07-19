@@ -13,7 +13,8 @@ import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 import parameters as params_module
@@ -384,3 +385,25 @@ def run_simulation(req: SimulationRequest):
         },
         "costs": _differential_costs(energy_before, energy_after),
     }
+
+
+# ── Static frontend (production) ──────────────────────────────────────────────
+# When the React app has been built (frontend/dist exists), serve it from the
+# same origin as the API so no CORS or proxy configuration is needed.
+
+_FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if _FRONTEND_DIST.exists():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(_FRONTEND_DIST / "assets")),
+        name="frontend-assets",
+    )
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        """Serve individual static files or fall back to index.html for client-side routing."""
+        candidate = _FRONTEND_DIST / full_path
+        if candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))

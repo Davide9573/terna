@@ -7,6 +7,47 @@ This project analyzes and visualizes the Italian electricity budget over a speci
 
 ---
 
+## Cloud Deployment
+
+The webapp (FastAPI backend + React frontend) can be published for free on [Render.com](https://render.com) in a single step.
+
+### Option A — Render.com (recommended, free tier)
+
+Render provides free HTTPS web services.  Free-tier instances spin down after ~15 min of inactivity and take about 30 s to cold-start on the next request — acceptable for a demo or educational app.
+
+1. Fork (or push) this repository to your GitHub account.
+2. Go to [dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**.
+3. Connect your repository.  Render will detect `render.yaml` automatically.
+4. Click **Apply** — Render will build and start the service.
+5. Your app will be available at `https://<service-name>.onrender.com` with HTTPS out of the box.
+
+The `render.yaml` blueprint at the root of the repository tells Render to:
+- Install Python dependencies.
+- Build the React frontend (`npm ci && npm run build`).
+- Regenerate `power_2025.npz` from the bundled CSV files.
+- Start the FastAPI server with `uvicorn`.
+
+### Option B — Docker (Fly.io, Railway, any container platform)
+
+A `Dockerfile` is provided for platforms that run containers.
+
+```bash
+# Build
+docker build -t terna .
+
+# Run locally
+docker run -p 8080:8080 terna
+```
+
+The container listens on port `8080` by default.  To deploy on **Fly.io** (free hobby plan):
+
+```bash
+fly launch   # follow the prompts, select the free plan
+fly deploy
+```
+
+---
+
 ## Environment Setup
 
 ### Prerequisites
@@ -29,7 +70,7 @@ source .venv/bin/activate
 ### Install dependencies
 
 ```bash
-pip install numpy pandas matplotlib
+pip install -r requirements.txt
 ```
 
 ## Code execution
