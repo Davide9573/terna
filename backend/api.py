@@ -390,25 +390,17 @@ def run_simulation(req: SimulationRequest):
 # ── Static frontend (production) ──────────────────────────────────────────────
 # When the React app has been built (frontend/dist exists), serve it from the
 # same origin as the API so no CORS or proxy configuration is needed.
+# StaticFiles with html=True serves every file in the dist directory and
+# returns index.html for any path that does not match a real file, which is
+# exactly what a React SPA needs for client-side routing.
+# No user-supplied path is used to construct filesystem paths, so there is no
+# path-traversal risk.
 
 _FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 if _FRONTEND_DIST.exists():
     app.mount(
-        "/assets",
-        StaticFiles(directory=str(_FRONTEND_DIST / "assets")),
-        name="frontend-assets",
+        "/",
+        StaticFiles(directory=str(_FRONTEND_DIST), html=True),
+        name="frontend",
     )
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_spa(full_path: str):
-        """Serve individual static files or fall back to index.html for client-side routing."""
-        candidate = (_FRONTEND_DIST / full_path).resolve()
-        try:
-            candidate.relative_to(_FRONTEND_DIST.resolve())
-        except ValueError:
-            # Path escapes the frontend dist directory — serve index.html instead
-            return FileResponse(str(_FRONTEND_DIST / "index.html"))
-        if candidate.is_file():
-            return FileResponse(str(candidate))
-        return FileResponse(str(_FRONTEND_DIST / "index.html"))
