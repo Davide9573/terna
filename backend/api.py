@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, field_validator
 
 import parameters as params_module
 import simulator as sim_module
-from utility import load_power_data_from_npz, to_energy, compute_peaks, PowerData, EnergyData
+from utility import ElectricData, load_power_data_from_npz
 
 NPZ_PATH = Path(__file__).parent.parent / "power_2025.npz"
 
@@ -40,7 +40,7 @@ app.add_middleware(
 )
 
 # ── Power data (loaded once at startup) ───────────────────────────────────────
-_power_data_2025: PowerData | None = None
+_power_data_2025: ElectricData | None = None
 
 @app.on_event("startup")
 async def _load_power_data():
@@ -235,7 +235,7 @@ def _apply_config() -> None:
         params_module.SOURCE_COSTS[source_key] = _config[param_key]
 
 
-def _power_data_to_dict(data: PowerData) -> dict:
+def _power_data_to_dict(data: ElectricData) -> dict:
     n = len(next(iter(data.power_item.values())))
     return {
         "start": data.start.isoformat(),
@@ -244,19 +244,19 @@ def _power_data_to_dict(data: PowerData) -> dict:
         "series": {k: v.tolist() for k, v in data.power_item.items()},
         "peaks": {
             k: {"value": float(v[0]), "time": v[1]}
-            for k, v in data.power_peaks.items()
+            for k, v in data.power_peak.items()
         },
     }
 
 
-def _energy_to_dict(energy: EnergyData) -> dict:
+def _energy_to_dict(data: ElectricData) -> dict:
     return {
         key: {"energy": float(energy_value), "cost": float(cost_value)}
-        for key, (energy_value, cost_value) in energy.energy_item.items()
+        for key, (energy_value, cost_value) in data.energy_item.items()
     }
 
 
-def _differential_costs(before: EnergyData, after: EnergyData) -> dict[str, float]:
+def _differential_costs(before: ElectricData, after: ElectricData) -> dict[str, float]:
     """Return annual cost changes by source from the two energy summaries."""
     sources = {**before.energy_item, **after.energy_item}
     return {
@@ -267,16 +267,16 @@ def _differential_costs(before: EnergyData, after: EnergyData) -> dict[str, floa
     }
 
 
-def _get_power_data_copy() -> PowerData:
+def _get_power_data_copy() -> ElectricData:
     """Return a shallow copy of the preloaded power data with fresh numpy array copies for power_item."""
     if _power_data_2025 is None:
         raise RuntimeError("Power data not yet loaded. Application startup may not have completed.")
-    # Create a shallow copy of the PowerData but with deep copies of the arrays
-    return PowerData(
+    return ElectricData(
         power_item={k: v.copy() for k, v in _power_data_2025.power_item.items()},
-        power_peaks={},  # Will be recalculated
+        power_peak={},
         start=_power_data_2025.start,
         end=_power_data_2025.end,
+        storage_capacity=_power_data_2025.storage_capacity,
     )
 
 
@@ -350,12 +350,12 @@ class SimulationRequest(BaseModel):
 def get_current_scenario():
     _apply_config()
     power_data = _get_power_data_copy()
-    compute_peaks(power_data)
-    energy = to_energy(power_data)
+    power_data.compute_peaks()
+    power_data.compute_energy()
     
     return {
         "chart": _power_data_to_dict(power_data),
-        "energy": _energy_to_dict(energy),
+        "energy": _energy_to_dict(power_data),
     }
 
 
@@ -363,10 +363,10 @@ def get_current_scenario():
 def run_simulation(req: SimulationRequest):
     _apply_config()
     power_data = _get_power_data_copy()
-    compute_peaks(power_data)
-    energy_before = to_energy(power_data)
+    power_data.compute_peaks()
+    power_data.compute_energy()
 
-    power_after, energy_after = sim_module.simulate_alternative_scenario(
+    power_after = sim_module.simulate_alternative_scenario(
         power_in=power_data,
         max_capacity=req.max_capacity,
         k_pv=req.k_pv,
@@ -377,13 +377,13 @@ def run_simulation(req: SimulationRequest):
     return {
         "before": {
             "chart": _power_data_to_dict(power_data),
-            "energy": _energy_to_dict(energy_before),
+            "energy": _energy_to_dict(power_data),
         },
         "after": {
             "chart": _power_data_to_dict(power_after),
-            "energy": _energy_to_dict(energy_after),
+            "energy": _energy_to_dict(power_after),
         },
-        "costs": _differential_costs(energy_before, energy_after),
+        "costs": _differential_costs(power_data, power_after),
     }
 
 

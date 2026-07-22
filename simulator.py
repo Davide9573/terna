@@ -2,8 +2,7 @@ import pandas as pd
 
 from parameters import ETA_CHARGE, ETA_DISCHARGE, NUCLEAR_BASE_LOAD_FACTOR
 from parameters import SOURCES, OTHER_POWER_ITEMS, SOURCE_COSTS
-from utility import PowerData, EnergyData
-from utility import compute_peaks, to_energy
+from utility import ElectricData
 import numpy as np
 
 import utility
@@ -90,16 +89,16 @@ def simulate_power_redistribution(
         new_power_item["Thermal"] = 0  # Set the thermal production to 0, as it is now included in the nuclear production
     return (new_power_item, capacity)
 
-def compute_differential_costs(data1: EnergyData, data2: EnergyData) -> dict[dict[str, float]]:
+def compute_differential_costs(data1: ElectricData, data2: ElectricData) -> dict[str, float]:
     """
     Compute the differential costs between two energy data sets, considering the costs of each source.
     The function returns a dictionary with the differential costs for each source and the total differential cost.
 
     Parameters
     ---------
-    data1 : EnergyData
+    data1 : ElectricData
         First energy data set, containing the energy produced by each source (in GWh).
-    data2 : EnergyData
+    data2 : ElectricData
         Second energy data set, containing the energy produced by each source (in GWh).
 
     Returns
@@ -120,7 +119,7 @@ def compute_differential_costs(data1: EnergyData, data2: EnergyData) -> dict[dic
     differential_costs["Total"] = total_cost
     return differential_costs
 
-def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv: float, k_w: float, nuke: bool) -> tuple[PowerData, EnergyData]:
+def simulate_alternative_scenario(power_in: ElectricData, max_capacity: float, k_pv: float, k_w: float, nuke: bool) -> ElectricData:
     """
     Simulate the production of electricity, starting from the production data by source, the electric power generation using:
     - an increased storage capacity max_capacity (GWh) - through electrochemical batteries or pumped storage - to store surplus energy and release it when needed
@@ -131,7 +130,7 @@ def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv
 
     Parameters
     ---------
-    power_in : PowerData
+    power_in : ElectricData
         Current electric power data, divided by type (for each quarter hour, in GW).
     max_capacity : float
         Maximum storage capacity, in GWh.
@@ -144,8 +143,8 @@ def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv
 
     Returns
     ----------
-    tuple[PowerData, EnergyData]
-        Updated electric power generation (for each quarter hour, in GW) and corresponding energy data.
+    ElectricData
+        Updated electric power and energy data.
     """
     new_power_item: dict[str, np.ndarray] = {} # Dizionario per la produzione simulata
     N_INTERVALS = len(power_in.power_item["Photovoltaic"]) # Numero di intervalli temporali (quarti d'ora) nella simulazione
@@ -191,11 +190,17 @@ def simulate_alternative_scenario(power_in: PowerData, max_capacity: float, k_pv
                     new_power_item["Import"][t] = 0  # Set the importation to 0 if it is negative
                 new_power_item["Net Import"][t] = new_power_item["Import"][t] - new_power_item["Export"][t]  # Update the net importation
 
-    power_after = PowerData(power_item=new_power_item, start=power_in.start, end=power_in.end)
-    compute_peaks(power_after)  # Compute the peaks of the simulated power data
-    return (power_after, to_energy(power_after))  # Return the simulated power data and the corresponding energy data
+    data_after = ElectricData(
+        power_item=new_power_item,
+        start=power_in.start,
+        end=power_in.end,
+        storage_capacity=max_capacity,
+    )
+    data_after.compute_peaks()
+    data_after.compute_energy()
+    return data_after
 
-def decarbonization_feasibility(power_in: PowerData, max_capacity: float, k_pv: float, k_w: float) -> bool:
+def decarbonization_feasibility(power_in: ElectricData, max_capacity: float, k_pv: float, k_w: float) -> bool:
     """
     Check if, starting from the production data by source, it is possible to decarbonize the electricity production
     without recourse to nuclear power, just using:
@@ -206,7 +211,7 @@ def decarbonization_feasibility(power_in: PowerData, max_capacity: float, k_pv: 
 
     Parameters
     ---------
-    power_in : PowerData
+    power_in : ElectricData
         Current electric power data, divided by type (for each quarter hour, in GW).
     max_capacity : float
         Maximum storage capacity, in GWh.
@@ -220,14 +225,14 @@ def decarbonization_feasibility(power_in: PowerData, max_capacity: float, k_pv: 
     bool
         True if it is possible to decarbonize the electricity production, False otherwise.
     """
-    simulated_power, _ = simulate_alternative_scenario(power_in, max_capacity, k_pv, k_w, nuke=False)
-    for t in range(len(simulated_power.power_item["Photovoltaic"])):
-        if simulated_power.power_item["Thermal"][t] > 0 or simulated_power.power_item["Import"][t] > 0:
+    simulated_data = simulate_alternative_scenario(power_in, max_capacity, k_pv, k_w, nuke=False)
+    for t in range(len(simulated_data.power_item["Photovoltaic"])):
+        if simulated_data.power_item["Thermal"][t] > 0 or simulated_data.power_item["Import"][t] > 0:
             return False
     return True
 
 def compute_decarbonization_minimum_storage_capacity(
-        power_in: PowerData,
+        power_in: ElectricData,
         capacity_range: float,
         k_pv: float,
         k_w: float) -> float:
@@ -240,7 +245,7 @@ def compute_decarbonization_minimum_storage_capacity(
 
     Parameters
     ---------
-    power_in : PowerData
+    power_in : ElectricData
         Current electric power data, divided by type (for each quarter hour, in GW).
     capacity_range : float
         Range of values to be checked, in storage capacity (GWh), within which to find the minimum capacity needed to decarbonize.
@@ -274,7 +279,7 @@ def compute_decarbonization_minimum_storage_capacity(
     return -1.0
 
 def compute_decarbonization_map(
-        power_in: PowerData,
+        power_in: ElectricData,
         k_pv_range: float,
         k_w_range: float,
         capacity_range: float) -> list[tuple[float, float, float, float]]:
@@ -289,7 +294,7 @@ def compute_decarbonization_map(
 
     Parameters
     ----------
-    power_in : PowerData
+    power_in : ElectricData
         Current electric power data, divided by type (for each quarter hour, in GW).
     k_pv_range : float
         Range of values to be checked, in the photovoltaic factor.
@@ -318,8 +323,9 @@ def compute_decarbonization_map(
             capacity = compute_decarbonization_minimum_storage_capacity(power_in, capacity_range, k_pv, k_w)
             if capacity < 0.0:
                 break
+            power_in.compute_energy()
             scenario = simulate_alternative_scenario(power_in, capacity, k_pv, k_w, nuke=False)
-            costs = compute_differential_costs(utility.to_energy(power_in), scenario[1])["Total"]
+            costs = compute_differential_costs(power_in, scenario)["Total"]
             results.append((k_pv, k_w, capacity, costs))
             k_w -= k_w_step
         k_pv -= k_pv_step

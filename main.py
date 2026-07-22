@@ -6,10 +6,11 @@ from pathlib import Path
 
 NPZ_PATH = Path(__file__).parent / "power_2025.npz"
 
-def output_data(power_data: simulator.PowerData, title: str):
-    utility.compute_peaks(power_data)  # Compute the peaks of the loaded power data
+def output_data(power_data: utility.ElectricData, title: str):
+    power_data.compute_peaks()
+    power_data.compute_energy()
     print(f"\n{title}:")
-    utility.print_power_data_summary((power_data, utility.to_energy(power_data)))
+    utility.print_power_data_summary(power_data)
     utility.plot_power_data(power_data)
     
 
@@ -32,13 +33,14 @@ if __name__ == "__main__":
              f"          - multiplying by {k_pv_} the installed photovoltaic power\n"
              f"          - multiplying by {k_w_} the installed wind power\n"
              f"           - adding {max_capacity_} GWh of storage capacity\n")
-    output_data(simulated_data[0], title)
+    output_data(simulated_data, title)
 
     # Compute and print the additional costs and of the simulated scenario compared to the original one
     print("\nAdditional costs of the simulated scenario compared to the original one:")
-    utility.print_differential_costs(utility.to_energy(power_data), simulated_data[1])
+    power_data.compute_energy()
+    utility.print_differential_costs(power_data, simulated_data)
 
     map_data = simulator.compute_decarbonization_map(
         power_data, k_pv_range=5.0, k_w_range=6.0, capacity_range=100000.0)
     if map_data is not None and len(map_data) > 0:
-        utility.plot_decarbonization_3d_map(map_data)
+        utility.plot_decarbonization_map(map_data)

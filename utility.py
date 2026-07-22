@@ -6,26 +6,58 @@ import pandas as pd
 
 
 @dataclass
-class PowerData:
-    """Data structure collecting:
-    - power production (per source), consumption and import/export data,
-    - power peaks (per item) and respective date/time of occurrence,
-    - start and end timestamp
-    duration of samples is assumed to be 15 minutes."""
-    power_item: dict[str, np.ndarray] = field(default_factory=dict)  # power values in GW
-    power_peaks: dict[str, tuple[float, str]] = field(default_factory=dict)  # power values in GW
-    start: pd.Timestamp = pd.Timestamp("1970-01-01")
-    end: pd.Timestamp = pd.Timestamp("1970-01-01")
+class ElectricData:
+    """Electric power, energy, storage capacity, and timing data for one scenario."""
+    power_item: dict[str, np.ndarray] = field(default_factory=dict)  # Dictionary of power values per source, in GW, with keys as source names and values as NumPy arrays of power values over time
+    power_peak: dict[str, tuple[float, str]] = field(default_factory=dict)  # Dictionary of peak power values per source, in GW, with keys as source names and values as tuples of (peak power value, timestamp of peak)
+    energy_item: dict[str, tuple[float, float]] = field(default_factory=dict)  # Dictionary of energy values per source, in GWh, with keys as source names and values as tuples of (energy value, cost)
+    start: pd.Timestamp = pd.Timestamp("1970-01-01")  # Start timestamp of the data, in UTC+02:00 timezone
+    end: pd.Timestamp = pd.Timestamp("1970-01-01")      # End timestamp of the data, in UTC+02:00 timezone
+    duration: pd.Timedelta = pd.Timedelta("0h")  # Duration of the data, calculated as end - start
+    storage_capacity: float = 0.0  # Storage capacity, in GWh
 
+    def compute_peaks(self) -> None:
+        self.power_peak = {}
+        total_power = np.zeros(len(next(iter(self.power_item.values()))))
+        for key in self.power_item:
+            if key in SOURCES:
+                total_power += np.nan_to_num(self.power_item[key], nan=0.0)
+        self.power_item["Total Production"] = total_power
+        self.power_item["Curtailment"] = total_power - np.nan_to_num(
+            self.power_item["Consumption"], nan=0.0
+        )
+        for key, values in self.power_item.items():
+            power_peak = np.nanmax(values)
+            peak_time = (
+                self.start + int(np.nanargmax(values)) * pd.Timedelta(minutes=15)
+            ).strftime("%Y-%m-%d %H:%M")
+            self.power_peak[key] = (power_peak, peak_time)
 
-@dataclass
-class EnergyData:
-    """Data structure collecting:
-    - energy production (per source), consumption and import/export data,
-    - cost data for different energy sources,
-    - duration of the time period considered."""
-    energy_item: dict[str, tuple[float, float]] = field(default_factory=dict)  # energy values in TWh, 
-    duration: pd.Timedelta = pd.Timedelta("0h") # in hours
+    def compute_energy(self) -> None:
+        self.duration = self.end - self.start
+        k_year = 365 / self.duration.days if self.duration.days > 0 else 0
+        self.energy_item = {}
+        for key in SOURCES:
+            energy_value = 0.0
+            if key in self.power_item:
+                energy_value = np.nansum(self.power_item[key]) / 4000
+            if key == "Storage":
+                cost_value = self.storage_capacity * SOURCE_COSTS[key] * k_year * 1e-6
+            else:
+                cost_value = energy_value * SOURCE_COSTS[key] * k_year * 1e-6
+            self.energy_item[key] = (energy_value, cost_value)
+        self.energy_item["Total Production"] = (
+            np.nansum([self.energy_item[key][0] for key in SOURCES]),
+            np.nansum([self.energy_item[key][1] for key in SOURCES]),
+        )
+        consumed_energy = np.nansum(self.power_item["Consumption"]) / 4000
+        self.energy_item["Consumption"] = (consumed_energy, 0.0)
+        if "Curtailment" in self.power_item:
+            curtailed_energy = np.nansum(self.power_item["Curtailment"]) / 4000
+            self.energy_item["Curtailment"] = (curtailed_energy, 0.0)
+        self.energy_item = dict(
+            sorted(self.energy_item.items(), key=lambda item: item[1][0], reverse=True)
+        )
 
 
 def normalize_to_daylight_saving_time(df: pd.DataFrame) -> pd.DataFrame:
@@ -62,7 +94,7 @@ def normalize_to_daylight_saving_time(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def load_generation_data_from_csv(csv_path: Path) -> PowerData:
+def load_generation_data_from_csv(csv_path: Path) -> ElectricData:
     """
     Read the CSV and return (dictionary { source: np.ndarray }, start timestamp).
     
@@ -98,10 +130,10 @@ def load_generation_data_from_csv(csv_path: Path) -> PowerData:
         )
         generation[source] = src_series.to_numpy(dtype=np.float64)
 
-    return PowerData(power_item=generation, start=start, end=end + pd.Timedelta(minutes=15))  # Include the last interval in the end timestamp
+    return ElectricData(power_item=generation, start=start, end=end + pd.Timedelta(minutes=15))  # Include the last interval in the end timestamp
 
 
-def load_consumption_data_from_csv(csv_path: Path) -> PowerData:
+def load_consumption_data_from_csv(csv_path: Path) -> ElectricData:
     """
     Read the CSV and return (dictionary { direction: np.ndarray }, start timestamp).
 
@@ -133,10 +165,10 @@ def load_consumption_data_from_csv(csv_path: Path) -> PowerData:
             .to_numpy(dtype=np.float64)
         )
     }
-    return PowerData(power_item=consumption, start=start, end=end + pd.Timedelta(minutes=15))
+    return ElectricData(power_item=consumption, start=start, end=end + pd.Timedelta(minutes=15))
 
 
-def load_import_export_data_from_csv(csv_path: Path) -> PowerData:
+def load_import_export_data_from_csv(csv_path: Path) -> ElectricData:
     """
     Read the CSV and return (dictionary { direction: np.ndarray }, start timestamp).
 
@@ -172,17 +204,17 @@ def load_import_export_data_from_csv(csv_path: Path) -> PowerData:
         "Net Import": net_import.reindex(expected_index).to_numpy(dtype=np.float64),
     }
 
-    return PowerData(power_item=import_export, start=start, end=end + pd.Timedelta(minutes=15))
+    return ElectricData(power_item=import_export, start=start, end=end + pd.Timedelta(minutes=15))
 
 
-def save_power_data_to_npz(data: PowerData, npz_path: Path) -> None:
-    """Save PowerData to a .npz file (compressed NumPy format)."""
+def save_power_data_to_npz(data: ElectricData, npz_path: Path) -> None:
+    """Save ElectricData to a .npz file (compressed NumPy format)."""
     np.savez(npz_path, __start__=np.array([data.start.isoformat()]), __end__=np.array([data.end.isoformat()]), **data.power_item)
 
 
-def load_power_data_from_npz(npz_path: Path) -> PowerData:
+def load_power_data_from_npz(npz_path: Path) -> ElectricData:
     """
-    Load and return a PowerData instance from a .npz file
+    Load and return an ElectricData instance from a .npz file
     previously saved with save_data_to_npz().
     """
     raw = np.load(npz_path, allow_pickle=False)
@@ -193,12 +225,12 @@ def load_power_data_from_npz(npz_path: Path) -> PowerData:
         for key in raw.files
         if key != "__start__" and key != "__end__"
     }
-    return PowerData(power_item=generation, start=start, end=end)
+    return ElectricData(power_item=generation, start=start, end=end)
 
 
-def merge_power_data(*datasets: PowerData) -> PowerData:
+def merge_power_data(*datasets: ElectricData) -> ElectricData:
     """
-    Merge multiple PowerData structures into a single one.
+    Merge multiple ElectricData structures into a single one.
 
     All datasets must have the same frequency. The common temporal index
     is constructed as the union of the ranges of each dataset;
@@ -207,16 +239,16 @@ def merge_power_data(*datasets: PowerData) -> PowerData:
 
     Parameters
     ----------
-    *datasets : PowerData
-        Two or more instances of PowerData to merge.
+    *datasets : ElectricData
+        Two or more instances of ElectricData to merge.
 
     Returns
     -------
-    PowerData
+    ElectricData
         Unified structure with start equal to the minimum among the datasets.
     """
     if not datasets:
-        raise ValueError("At least one PowerData instance must be provided for merging.")
+        raise ValueError("At least one ElectricData instance must be provided for merging.")
 
     # Construct the common temporal index as the union of all dataset ranges
     all_starts = [d.start for d in datasets]
@@ -270,61 +302,20 @@ def merge_power_data(*datasets: PowerData) -> PowerData:
     all_ends = [d.end for d in datasets]
     global_end = max(all_ends)
 
-    return PowerData(
+    return ElectricData(
         power_item=merged_power_item,
         start=global_start,
         end=global_end
     )
 
 
-def compute_peaks(power_data: PowerData):
-    power_data.power_peaks = {}
-    # Compute the total production across all sources for each time interval
-    total_power = np.zeros(len(next(iter(power_data.power_item.values()))))  # Initialize total power array
-    for key in power_data.power_item.keys():
-        if key in SOURCES:
-            total_power += np.nan_to_num(power_data.power_item[key], nan=0.0)
-    power_data.power_item["Total Production"] = total_power
-    # Compute the power curtailment across all sources for each time interval
-    curtailed_power = total_power.copy()  # Initialize curtailment power array
-    curtailed_power -= np.nan_to_num(power_data.power_item["Consumption"], nan=0.0)
-    power_data.power_item["Curtailment"] = curtailed_power
-    # Compute the peak power and corresponding time for each source and other power items
-    for key in power_data.power_item.keys():
-        power_peak = np.nanmax(power_data.power_item[key])
-        peak_time = (power_data.start + int(np.nanargmax(power_data.power_item[key])) * pd.Timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M")
-        power_data.power_peaks[key] = (power_peak, peak_time)
-
-
-def to_energy(power_data: PowerData) -> EnergyData:
-    energy_data = EnergyData()
-    energy_data.duration = power_data.end - power_data.start
-    # Reparametrization factor to convert the costs to a solar year, based on the duration of the simulation, in hours
-    k_year = 365 / energy_data.duration.days if energy_data.duration.days > 0 else 0
-    for key in SOURCES:
-        energy_value = 0
-        if key in power_data.power_item:
-            energy_value = np.nansum(power_data.power_item[key]) / 4000  # Convert from GW to TWh, assuming 15-minute intervals
-        cost_value = energy_value * SOURCE_COSTS[key] * k_year * 1e-6  # Convert the costs to billions of dollars per year
-        energy_data.energy_item[key] = (energy_value, cost_value)
-    energy_data.energy_item["Total Production"] = (np.nansum([energy_data.energy_item[key][0] for key in SOURCES]) , np.nansum([energy_data.energy_item[key][1] for key in SOURCES]))
-    consumed_energy = np.nansum(power_data.power_item["Consumption"]) / 4000
-    energy_data.energy_item["Consumption"] = (consumed_energy, 0.0)  # Consumption has no associated cost
-    if "Curtailment" in power_data.power_item:
-        curtailed_energy = np.nansum(power_data.power_item["Curtailment"]) / 4000
-        energy_data.energy_item["Curtailment"] = (curtailed_energy, 0.0)  # Curtailment has no associated cost
-    # sort the energy_item dictionary by energy values in descending order
-    energy_data.energy_item = {k: v for k, v in sorted(energy_data.energy_item.items(), key=lambda item: item[1][0], reverse=True)}
-    return energy_data
-
-
-def plot_power_data(data: PowerData) -> None:
+def plot_power_data(data: ElectricData) -> None:
     """
     Plot a stacked graph of production by source, overlaying the consumption, import and export curves.
 
     Parameters
     ----------
-    data : PowerData
+    data : ElectricData
         the power data and corresponding energy data to plot.
     """
     power_item = data.power_item
@@ -430,7 +421,7 @@ def plot_decarbonization_map(points: list[tuple[float, float, float, float]]) ->
     plt.show()
 
 
-def plot_decarbonization_3d_map(points: list[tuple[float, float, float, float]]) -> None:
+def plot_decarbonization_map(points: list[tuple[float, float, float, float]]) -> None:
     """Plot interpolated 3D decarbonization surfaces for storage capacity and costs.
 
     Parameters
@@ -453,7 +444,7 @@ def plot_decarbonization_3d_map(points: list[tuple[float, float, float, float]])
 
     fig = plt.figure(figsize=(16, 7))
     maps = (
-        ('Storage Capacity (GWh)', storage_capacities,
+        ('Storage Capacity (TWh)', storage_capacities / 1000,
          'Storage Capacity\n(needed to decarbonize without nuclear power)'),
         ('Costs (b€/year)', costs,
          'Additional Costs\n(to decarbonize without nuclear power)'),
@@ -477,17 +468,17 @@ def plot_decarbonization_3d_map(points: list[tuple[float, float, float, float]])
     plt.show()
 
 
-def print_power_data_summary(data: tuple[PowerData, EnergyData]) -> None:
-    """Print a summary of the power data to the console.
+def print_power_data_summary(data: ElectricData) -> None:
+    """Print a summary of the electric data to the console.
     
     Parameters
     ----------
-    data : tuple[PowerData, EnergyData]
-        the power data and corresponding energy data to print.
+    data : ElectricData
+        The electric data to print.
     """
 
-    power_data = data[0]
-    energy_data = data[1]
+    power_data = data
+    energy_data = data
     # Print the table header
     print("-" * 93)
     print(f"{'Source':<18} {'Energy (TWh)':>14} {'Cost (G€)':>14} {'Power Peak (GW)':>16} {'Peak Time':>20}")
@@ -496,29 +487,29 @@ def print_power_data_summary(data: tuple[PowerData, EnergyData]) -> None:
     print("-" * 93)
     for source in energy_data.energy_item.keys():
         if source in SOURCES and energy_data.energy_item[source][0] > 0:
-                print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
+                print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peak[source][0]:>16.2f} {power_data.power_peak[source][1]:>20}")
 
     # Print the total energy production (sum of all sources) and curtailment, including respective maximum power peaks and time
     print("-" * 93)
-    print(f"{'Total Production':<18} {energy_data.energy_item['Total Production'][0]:>14.2f} {energy_data.energy_item['Total Production'][1]:>14.2f} {power_data.power_peaks['Total Production'][0]:>16.2f} {power_data.power_peaks['Total Production'][1]:>20}")
-    print(f"{'Curtailment':<18} {energy_data.energy_item['Curtailment'][0]:>14.2f} {'---':>14} {power_data.power_peaks['Curtailment'][0]:>16.2f} {power_data.power_peaks['Curtailment'][1]:>20}")
+    print(f"{'Total Production':<18} {energy_data.energy_item['Total Production'][0]:>14.2f} {energy_data.energy_item['Total Production'][1]:>14.2f} {power_data.power_peak['Total Production'][0]:>16.2f} {power_data.power_peak['Total Production'][1]:>20}")
+    print(f"{'Curtailment':<18} {energy_data.energy_item['Curtailment'][0]:>14.2f} {'---':>14} {power_data.power_peak['Curtailment'][0]:>16.2f} {power_data.power_peak['Curtailment'][1]:>20}")
 
     # Print the cumulative energy, the maximum peak, and the corresponding time, for each non-source power item
     print("-" * 93)
     for source in energy_data.energy_item.keys():
         if source in OTHER_POWER_ITEMS and energy_data.energy_item[source][0] > 0:
-            print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peaks[source][0]:>16.2f} {power_data.power_peaks[source][1]:>20}")
+            print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peak[source][0]:>16.2f} {power_data.power_peak[source][1]:>20}")
     print("-" * 93)
 
 
-def print_differential_costs(data1: EnergyData, data2: EnergyData) -> None:
+def print_differential_costs(data1: ElectricData, data2: ElectricData) -> None:
     """Print a summary of the differential cost data to the console.
 
     Parameters
     ----------
-    data1 : EnergyData
+    data1 : ElectricData
         the energy data for the original scenario.
-    data2 : EnergyData
+    data2 : ElectricData
         the energy data for the simulated scenario.
     """
 
