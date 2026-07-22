@@ -28,7 +28,7 @@ if __name__ == "__main__":
     nuke =False
     simulated_data = simulator.simulate_alternative_scenario(power_in=power_data, max_capacity=max_capacity_, k_pv=k_pv_, k_w=k_w_, nuke=nuke)
 
-    # Plot and print the simulated data for consumption, generation and import/export
+    # Plot and print the simulated data for consumption .generation and import/export
     title = (f"Summary of power data simulated by\n"
              f"          - multiplying by {k_pv_} the installed photovoltaic power\n"
              f"          - multiplying by {k_w_} the installed wind power\n"
@@ -40,7 +40,12 @@ if __name__ == "__main__":
     power_data.compute_energy()
     utility.print_differential_costs(power_data, simulated_data)
 
-    decarbonization_data = simulator.compute_decarbonization_surface(
-        power_data, k_pv_range=20.0, k_w_range=20.0, capacity_range=10000.0)
-    if decarbonization_data is not None and len(decarbonization_data) > 0:
-        utility.plot_decarbonization_surface(decarbonization_data)
+    if False:
+        decarbonization_surface = simulator.compute_decarbonization_surface(
+            power_data, k_pv_range=20.0, k_w_range=20.0, capacity_range=10000.0)
+        if decarbonization_surface is not None and len(decarbonization_surface) > 0:
+            utility.save_decarbonization_surface_to_csv(decarbonization_surface, "decarbonization_surface.csv")
+
+    decarbonization_surface = utility.load_decarbonization_surface_from_csv("decarbonization_surface.csv")
+    decarbonization_costs = simulator.compute_decarbonization_costs(power_data, decarbonization_surface)
+    utility.plot_decarbonization_surface(decarbonization_costs)

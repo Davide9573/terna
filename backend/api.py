@@ -8,8 +8,6 @@ from collections import defaultdict, deque
 # Make the parent directory (project root) importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import pandas as pd
-import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,9 +17,11 @@ from pydantic import BaseModel, Field, field_validator
 
 import parameters as params_module
 import simulator as sim_module
+import utility
 from utility import ElectricData, load_power_data_from_npz
 
 NPZ_PATH = Path(__file__).parent.parent / "power_2025.npz"
+SURFACE_CSV_PATH = Path(__file__).parent.parent / "decarbonization_surface.csv"
 
 app = FastAPI(title="Terna Energy Simulator API")
 
@@ -47,6 +47,7 @@ async def _load_power_data():
     """Load power data from NPZ file once at application startup."""
     global _power_data_2025
     _power_data_2025 = load_power_data_from_npz(NPZ_PATH)
+    _power_data_2025.compute_energy()
     print(f"✓ Power data (2025) loaded from {NPZ_PATH}")
 
 # ── Immutable defaults (captured once at startup) ─────────────────────────────
@@ -274,8 +275,10 @@ def _get_power_data_copy() -> ElectricData:
     return ElectricData(
         power_item={k: v.copy() for k, v in _power_data_2025.power_item.items()},
         power_peak={},
+        energy_item=dict(_power_data_2025.energy_item),
         start=_power_data_2025.start,
         end=_power_data_2025.end,
+        duration=_power_data_2025.duration,
         storage_capacity=_power_data_2025.storage_capacity,
     )
 
@@ -322,6 +325,8 @@ def update_parameter(update: ParameterUpdate):
         )
     _config[update.key] = update.value
     _apply_config()
+    if update.key in _SOURCE_COST_MAP and _power_data_2025 is not None:
+        _power_data_2025.compute_energy()
     return {"key": update.key, "value": _config[update.key]}
 
 
@@ -329,6 +334,8 @@ def update_parameter(update: ParameterUpdate):
 def reset_parameters():
     _config.update(_DEFAULTS)
     _apply_config()
+    if _power_data_2025 is not None:
+        _power_data_2025.compute_energy()
     return get_parameters()
 
 
@@ -410,3 +417,26 @@ if _FRONTEND_DIST.exists():
         StaticFiles(directory=str(_FRONTEND_DIST), html=True),
         name="frontend",
     )
+
+
+@app.post("/api/decarbonization-surface")
+def get_decarbonization_surface():
+    """Calculate costs for the saved decarbonization surface."""
+    _apply_config()
+    power_data = _get_power_data_copy()
+    decarbonization_surface = utility.load_decarbonization_surface_from_csv(
+        SURFACE_CSV_PATH
+    )
+    points = sim_module.compute_decarbonization_costs(power_data, decarbonization_surface)
+    utility.plot_decarbonization_surface(points, show=False)
+    return {
+        "points": [
+            {
+                "k_pv": k_pv,
+                "k_w": k_w,
+                "storage_capacity": storage_capacity,
+                "cost": cost,
+            }
+            for k_pv, k_w, storage_capacity, cost in points
+        ]
+    }

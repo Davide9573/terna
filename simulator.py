@@ -282,14 +282,13 @@ def compute_decarbonization_surface(
         power_in: ElectricData,
         k_pv_range: float,
         k_w_range: float,
-        capacity_range: float) -> list[tuple[float, float, float, float]]:
+        capacity_range: float) -> list[tuple[float, float, float]]:
     """
     Compute the surface of states in the k_pv-k_wind space, where decarbonizing the electricity production is possible
     without recourse to nuclear power. The simulation returns a list of tuples with:
     - the factor k_pv,
     - the factor k_wind,
-    - the storage capacity (GWh),
-    - the corresponding costs (G€/year),
+    - the storage capacity (GWh)
     needed to decarbonize the electricity production.
 
     Parameters
@@ -305,15 +304,14 @@ def compute_decarbonization_surface(
 
     Returns
     -------
-    list[tuple[float, float, float, float]]
+    list[tuple[float, float, float]]
         List of tuples with:
         - factor k_pv,
         - factor k_wind,
-        - storage capacity (GWh),
-        - corresponding costs (G€/year)
-        to decarbonize the electricity production without nuclear power.
+        - storage capacity (GWh)
+        needed to decarbonize the electricity production without nuclear power.
     """
-    results: list[tuple[float, float, float, float]] = []
+    results: list[tuple[float, float, float]] = []
     k_pv_step = k_pv_range / 10.0  # Step size for the k_pv factor
     k_w_step = k_w_range / 10.0  # Step size for the k_w factor
     k_pv = k_pv_range
@@ -323,10 +321,30 @@ def compute_decarbonization_surface(
             capacity = compute_decarbonization_minimum_storage_capacity(power_in, capacity_range, k_pv, k_w)
             if capacity < 0.0:
                 break
-            power_in.compute_energy()
-            scenario = simulate_alternative_scenario(power_in, capacity, k_pv, k_w, nuke=False)
-            costs = compute_differential_costs(power_in, scenario)["Total"]
-            results.append((k_pv, k_w, capacity, costs))
+            results.append((k_pv, k_w, capacity))
             k_w -= k_w_step
         k_pv -= k_pv_step
+    return results
+
+def compute_decarbonization_costs(
+        power_in: ElectricData,
+        decarbonization_surface: list[tuple[float, float, float]]) -> list[tuple[float, float, float, float]]:
+    """
+    Compute the costs of decarbonization for each point in the decarbonization surface.
+
+    Parameters
+    ----------
+    decarbonization_surface : list[tuple[float, float, float]]
+        List of tuples with (k_pv_factor, k_w_factor, storage_capacity).
+
+    Returns
+    -------
+    list[tuple[float, float, float, float]]
+        List of tuples with (k_pv_factor, k_w_factor, storage_capacity, additional_costs).
+    """
+    results: list[tuple[float, float, float, float]] = []
+    for k_pv, k_w, capacity in decarbonization_surface:
+        scenario = simulate_alternative_scenario(power_in, capacity, k_pv, k_w, nuke=False)
+        costs = compute_differential_costs(power_in, scenario)["Total"]
+        results.append((k_pv, k_w, capacity, costs))
     return results

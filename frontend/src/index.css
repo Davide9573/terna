@@ -228,6 +228,11 @@ body {
   padding-bottom: 0.45rem;
   margin-bottom: 1rem;
 }
+.results-description-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.surface-loading { min-height: 300px; padding: 2rem; }
 
 /* ── Summary table ─────────────────────────────────────────── */
 .summary-table-wrapper { overflow-x: auto; margin-top: 0.75rem; }

@@ -212,6 +212,39 @@ def save_power_data_to_npz(data: ElectricData, npz_path: Path) -> None:
     np.savez(npz_path, __start__=np.array([data.start.isoformat()]), __end__=np.array([data.end.isoformat()]), **data.power_item)
 
 
+def save_decarbonization_surface_to_csv(points: list[tuple[float, float, float]], csv_path: Path) -> None:
+    """
+    Save the decarbonization surface points to a CSV file.
+
+    Parameters
+    ----------
+    points : list[tuple[float, float, float]]
+        A list of tuples containing (k_pv_factor, k_w_factor, storage_capacity).
+    csv_path : Path
+        The path to the output CSV file.
+    """
+    df = pd.DataFrame(points, columns=["k_pv_factor", "k_w_factor", "storage_capacity"])
+    df.to_csv(csv_path, index=False)
+
+
+def load_decarbonization_surface_from_csv(csv_path: Path) -> list[tuple[float, float, float]]:
+    """
+    Load the decarbonization surface points from a CSV file.
+
+    Parameters
+    ----------
+    csv_path : Path
+        The path to the input CSV file.
+
+    Returns
+    -------
+    list[tuple[float, float, float]]
+        A list of tuples containing (k_pv_factor, k_w_factor, storage_capacity).
+    """
+    df = pd.read_csv(csv_path)
+    return list(df.itertuples(index=False, name=None))
+
+
 def load_power_data_from_npz(npz_path: Path) -> ElectricData:
     """
     Load and return an ElectricData instance from a .npz file
@@ -385,7 +418,8 @@ def plot_power_data(data: ElectricData) -> None:
     plt.show()
 
 
-def plot_decarbonization_surface(points: list[tuple[float, float, float, float]]) -> None:
+def plot_decarbonization_surface(
+    points: list[tuple[float, float, float, float]], show: bool = True) -> None:
     """
     Plot a 3D storage-capacity surface colored by interpolated costs.
 
@@ -445,7 +479,10 @@ def plot_decarbonization_surface(points: list[tuple[float, float, float, float]]
                  'the Italian electricity generation system without nuclear power,\n' \
                  'and related additional costs (w.r.t. the 2025 scenario)', fontsize=14)
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def print_power_data_summary(data: ElectricData) -> None:
