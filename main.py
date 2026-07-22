@@ -40,7 +40,7 @@ if __name__ == "__main__":
     power_data.compute_energy()
     utility.print_differential_costs(power_data, simulated_data)
 
-    map_data = simulator.compute_decarbonization_map(
-        power_data, k_pv_range=5.0, k_w_range=6.0, capacity_range=100000.0)
-    if map_data is not None and len(map_data) > 0:
-        utility.plot_decarbonization_map(map_data)
+    decarbonization_data = simulator.compute_decarbonization_surface(
+        power_data, k_pv_range=20.0, k_w_range=20.0, capacity_range=10000.0)
+    if decarbonization_data is not None and len(decarbonization_data) > 0:
+        utility.plot_decarbonization_surface(decarbonization_data)

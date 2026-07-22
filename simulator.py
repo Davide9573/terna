@@ -278,13 +278,13 @@ def compute_decarbonization_minimum_storage_capacity(
         return high_capacity
     return -1.0
 
-def compute_decarbonization_map(
+def compute_decarbonization_surface(
         power_in: ElectricData,
         k_pv_range: float,
         k_w_range: float,
         capacity_range: float) -> list[tuple[float, float, float, float]]:
     """
-    Compute the map of states in the k_pv-k_wind space, where decarbonizing the electricity production is possible
+    Compute the surface of states in the k_pv-k_wind space, where decarbonizing the electricity production is possible
     without recourse to nuclear power. The simulation returns a list of tuples with:
     - the factor k_pv,
     - the factor k_wind,

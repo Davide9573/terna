@@ -12,9 +12,9 @@ export default function HomePage() {
   return (
     <div className="page">
       <header className="app-header">
-        <h1>Simulatore del Bilancio Energetico Italiano</h1>
-        <p className="subtitle">Analisi degli scenari alternativi per la produzione di energia elettrica
-          in Italia — dati TERNA 2025</p>
+        <h1>Decarbonizzare il sistema di generazione dell'energia elettrica italiano è possibile?<br />
+          In che modo? E a quale costo?</h1>
+        <p className="subtitle">Analisi degli scenari alternativi — dati TERNA 2025</p>
       </header>
 
       <main className="content">

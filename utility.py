@@ -385,44 +385,9 @@ def plot_power_data(data: ElectricData) -> None:
     plt.show()
 
 
-def plot_decarbonization_map(points: list[tuple[float, float, float, float]]) -> None:
+def plot_decarbonization_surface(points: list[tuple[float, float, float, float]]) -> None:
     """
-    Plot decarbonization storage capacity and additional costs in the k_pv-k_w plane.
-
-    Parameters
-    ----------
-    points : list[tuple[float, float, float, float]]
-        a list of tuples containing (k_pv_factor, k_w_factor, storage_capacity, cost) for each point on the curve.
-    """
-    import matplotlib.pyplot as plt
-    if not points:
-        return
-    # Unzip the points into separate lists
-    k_pv_factors, k_w_factors, storage_capacities, costs = zip(*points)
-
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharex=True, sharey=True)
-    maps = (
-        (axes[0], storage_capacities, 'Storage Capacity (GWh)',
-         'Storage Capacity\n(needed to decarbonize without nuclear power)'),
-        (axes[1], costs, 'Costs (b€/year)',
-         'Additional Costs\n(to decarbonize without nuclear power)'),
-    )
-    for ax, values, colorbar_label, title in maps:
-        scatter = ax.scatter(k_pv_factors, k_w_factors, c=values, cmap='viridis', s=100)
-        colorbar = fig.colorbar(scatter, ax=ax)
-        colorbar.set_label(colorbar_label, rotation=90, labelpad=15)
-        ax.set_xlabel('k_pv Factor')
-        ax.set_title(title)
-        ax.grid(True)
-
-    axes[0].set_ylabel('k_w Factor')
-    fig.suptitle('Decarbonization Map')
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_decarbonization_map(points: list[tuple[float, float, float, float]]) -> None:
-    """Plot interpolated 3D decarbonization surfaces for storage capacity and costs.
+    Plot a 3D storage-capacity surface colored by interpolated costs.
 
     Parameters
     ----------
@@ -442,34 +407,50 @@ def plot_decarbonization_map(points: list[tuple[float, float, float, float]]) ->
         np.linspace(k_w_factors.min(), k_w_factors.max(), 100),
     )
 
-    fig = plt.figure(figsize=(16, 7))
-    maps = (
-        ('Storage Capacity (TWh)', storage_capacities / 1000,
-         'Storage Capacity\n(needed to decarbonize without nuclear power)'),
-        ('Costs (b€/year)', costs,
-         'Additional Costs\n(to decarbonize without nuclear power)'),
+    storage_interpolator = mtri.LinearTriInterpolator(
+        triangulation, storage_capacities / 1000
     )
-    for index, (z_label, values, title) in enumerate(maps, start=1):
-        ax = fig.add_subplot(1, 2, index, projection='3d')
-        interpolator = mtri.LinearTriInterpolator(triangulation, values)
-        grid_values = interpolator(grid_k_pv, grid_k_w)
-        surface = ax.plot_surface(
-            grid_k_pv, grid_k_w, grid_values, cmap='viridis', linewidth=0, antialiased=True
-        )
-        ax.scatter(k_pv_factors, k_w_factors, values, color='black', s=20)
-        fig.colorbar(surface, ax=ax, shrink=0.7, pad=0.1, label=z_label)
-        ax.set_xlabel('k_pv Factor')
-        ax.set_ylabel('k_w Factor')
-        ax.set_zlabel(z_label)
-        ax.set_title(title)
+    cost_interpolator = mtri.LinearTriInterpolator(triangulation, costs)
+    grid_storage = storage_interpolator(grid_k_pv, grid_k_w)
+    grid_costs = cost_interpolator(grid_k_pv, grid_k_w)
+    cost_normalization = plt.Normalize(vmin=costs.min(), vmax=costs.max())
+    colormap = plt.get_cmap('viridis')
 
-    fig.suptitle('Decarbonization Map')
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(projection='3d')
+    ax.plot_surface(
+        grid_k_pv,
+        grid_k_w,
+        grid_storage,
+        facecolors=colormap(cost_normalization(grid_costs)),
+        linewidth=0,
+        antialiased=True,
+    )
+    points_scatter = ax.scatter(
+        k_pv_factors,
+        k_w_factors,
+        storage_capacities / 1000,
+        c=costs,
+        cmap=colormap,
+        norm=cost_normalization,
+        edgecolors='black',
+        s=30,
+    )
+    fig.colorbar(points_scatter, ax=ax, shrink=0.7, pad=0.1, label='Costs (b€/year)')
+    ax.set_xlabel('minimum PV power multiplicator')
+    ax.set_ylabel('minimum wind power multiplicator')
+    ax.set_zlabel('minimum storage capacity (TWh)')
+    ax.set_title('Decarbonization Surface\n' \
+                 'Minimum (k_pv, k_w, C) needed to decarbonize\n' \
+                 'the Italian electricity generation system without nuclear power,\n' \
+                 'and related additional costs (w.r.t. the 2025 scenario)', fontsize=14)
     plt.tight_layout()
     plt.show()
 
 
 def print_power_data_summary(data: ElectricData) -> None:
-    """Print a summary of the electric data to the console.
+    """
+    Print a summary of the electric data to the console.
     
     Parameters
     ----------
