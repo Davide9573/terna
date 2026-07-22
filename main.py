@@ -1,3 +1,5 @@
+from numpy import empty
+
 import utility
 import simulator
 from pathlib import Path
@@ -19,19 +21,24 @@ if __name__ == "__main__":
     output_data(power_data, title)
     
     # Simulate the production of electricity with surplus from photovoltaic, wind and storage
-    max_capacity_=100
-    k_pv_=3
-    k_w_=2
-    nuke =True
+    max_capacity_=2000
+    k_pv_=10
+    k_w_=1
+    nuke =False
     simulated_data = simulator.simulate_alternative_scenario(power_in=power_data, max_capacity=max_capacity_, k_pv=k_pv_, k_w=k_w_, nuke=nuke)
 
     # Plot and print the simulated data for consumption, generation and import/export
     title = (f"Summary of power data simulated by\n"
              f"          - multiplying by {k_pv_} the installed photovoltaic power\n"
              f"          - multiplying by {k_w_} the installed wind power\n"
-             f"          - adding {max_capacity_} GWh of storage capacity\n")
+             f"           - adding {max_capacity_} GWh of storage capacity\n")
     output_data(simulated_data[0], title)
 
     # Compute and print the additional costs and of the simulated scenario compared to the original one
     print("\nAdditional costs of the simulated scenario compared to the original one:")
     utility.print_differential_costs(utility.to_energy(power_data), simulated_data[1])
+
+    map_data = simulator.compute_decarbonization_map(
+        power_data, k_pv_range=5.0, k_w_range=6.0, capacity_range=100000.0)
+    if map_data is not None and len(map_data) > 0:
+        utility.plot_decarbonization_3d_map(map_data)

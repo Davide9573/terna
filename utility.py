@@ -17,6 +17,7 @@ class PowerData:
     start: pd.Timestamp = pd.Timestamp("1970-01-01")
     end: pd.Timestamp = pd.Timestamp("1970-01-01")
 
+
 @dataclass
 class EnergyData:
     """Data structure collecting:
@@ -25,6 +26,7 @@ class EnergyData:
     - duration of the time period considered."""
     energy_item: dict[str, tuple[float, float]] = field(default_factory=dict)  # energy values in TWh, 
     duration: pd.Timedelta = pd.Timedelta("0h") # in hours
+
 
 def normalize_to_daylight_saving_time(df: pd.DataFrame) -> pd.DataFrame:
     """Express local Italian timestamps using a continuous UTC+02:00 reference."""
@@ -306,8 +308,11 @@ def to_energy(power_data: PowerData) -> EnergyData:
         cost_value = energy_value * SOURCE_COSTS[key] * k_year * 1e-6  # Convert the costs to billions of dollars per year
         energy_data.energy_item[key] = (energy_value, cost_value)
     energy_data.energy_item["Total Production"] = (np.nansum([energy_data.energy_item[key][0] for key in SOURCES]) , np.nansum([energy_data.energy_item[key][1] for key in SOURCES]))
-    curtailed_energy = np.nansum(power_data.power_item["Curtailment"]) / 4000
-    energy_data.energy_item["Curtailment"] = (curtailed_energy, 0.0)  # Curtailment has no associated cost
+    consumed_energy = np.nansum(power_data.power_item["Consumption"]) / 4000
+    energy_data.energy_item["Consumption"] = (consumed_energy, 0.0)  # Consumption has no associated cost
+    if "Curtailment" in power_data.power_item:
+        curtailed_energy = np.nansum(power_data.power_item["Curtailment"]) / 4000
+        energy_data.energy_item["Curtailment"] = (curtailed_energy, 0.0)  # Curtailment has no associated cost
     # sort the energy_item dictionary by energy values in descending order
     energy_data.energy_item = {k: v for k, v in sorted(energy_data.energy_item.items(), key=lambda item: item[1][0], reverse=True)}
     return energy_data
@@ -385,6 +390,89 @@ def plot_power_data(data: PowerData) -> None:
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles[::-1], labels[::-1], loc="upper left")
     ax.grid(True, axis="y")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_decarbonization_map(points: list[tuple[float, float, float, float]]) -> None:
+    """
+    Plot decarbonization storage capacity and additional costs in the k_pv-k_w plane.
+
+    Parameters
+    ----------
+    points : list[tuple[float, float, float, float]]
+        a list of tuples containing (k_pv_factor, k_w_factor, storage_capacity, cost) for each point on the curve.
+    """
+    import matplotlib.pyplot as plt
+    if not points:
+        return
+    # Unzip the points into separate lists
+    k_pv_factors, k_w_factors, storage_capacities, costs = zip(*points)
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharex=True, sharey=True)
+    maps = (
+        (axes[0], storage_capacities, 'Storage Capacity (GWh)',
+         'Storage Capacity\n(needed to decarbonize without nuclear power)'),
+        (axes[1], costs, 'Costs (b€/year)',
+         'Additional Costs\n(to decarbonize without nuclear power)'),
+    )
+    for ax, values, colorbar_label, title in maps:
+        scatter = ax.scatter(k_pv_factors, k_w_factors, c=values, cmap='viridis', s=100)
+        colorbar = fig.colorbar(scatter, ax=ax)
+        colorbar.set_label(colorbar_label, rotation=90, labelpad=15)
+        ax.set_xlabel('k_pv Factor')
+        ax.set_title(title)
+        ax.grid(True)
+
+    axes[0].set_ylabel('k_w Factor')
+    fig.suptitle('Decarbonization Map')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_decarbonization_3d_map(points: list[tuple[float, float, float, float]]) -> None:
+    """Plot interpolated 3D decarbonization surfaces for storage capacity and costs.
+
+    Parameters
+    ----------
+    points : list[tuple[float, float, float, float]]
+        A list of tuples containing (k_pv_factor, k_w_factor, storage_capacity, cost).
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.tri as mtri
+
+    if len(points) < 3:
+        return
+
+    k_pv_factors, k_w_factors, storage_capacities, costs = map(np.asarray, zip(*points))
+    triangulation = mtri.Triangulation(k_pv_factors, k_w_factors)
+    grid_k_pv, grid_k_w = np.meshgrid(
+        np.linspace(k_pv_factors.min(), k_pv_factors.max(), 100),
+        np.linspace(k_w_factors.min(), k_w_factors.max(), 100),
+    )
+
+    fig = plt.figure(figsize=(16, 7))
+    maps = (
+        ('Storage Capacity (GWh)', storage_capacities,
+         'Storage Capacity\n(needed to decarbonize without nuclear power)'),
+        ('Costs (b€/year)', costs,
+         'Additional Costs\n(to decarbonize without nuclear power)'),
+    )
+    for index, (z_label, values, title) in enumerate(maps, start=1):
+        ax = fig.add_subplot(1, 2, index, projection='3d')
+        interpolator = mtri.LinearTriInterpolator(triangulation, values)
+        grid_values = interpolator(grid_k_pv, grid_k_w)
+        surface = ax.plot_surface(
+            grid_k_pv, grid_k_w, grid_values, cmap='viridis', linewidth=0, antialiased=True
+        )
+        ax.scatter(k_pv_factors, k_w_factors, values, color='black', s=20)
+        fig.colorbar(surface, ax=ax, shrink=0.7, pad=0.1, label=z_label)
+        ax.set_xlabel('k_pv Factor')
+        ax.set_ylabel('k_w Factor')
+        ax.set_zlabel(z_label)
+        ax.set_title(title)
+
+    fig.suptitle('Decarbonization Map')
     plt.tight_layout()
     plt.show()
 
