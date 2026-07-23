@@ -4,6 +4,7 @@ import os
 import math
 import time
 from collections import defaultdict, deque
+from threading import Lock
 
 # Make the parent directory (project root) importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,6 +24,11 @@ from utility import ElectricData, load_power_data_from_npz
 NPZ_PATH = Path(__file__).parent.parent / "power_2025.npz"
 SURFACE_CSV_PATH = Path(__file__).parent.parent / "decarbonization_surface.csv"
 
+DEFAULT_K_PV_RANGE = 20.0
+DEFAULT_K_W_RANGE = 20.0
+DEFAULT_STORAGE_CAPACITY_RANGE_TWH = 20.0
+_DEFAULT_STORAGE_CAPACITY_RANGE_GWH = DEFAULT_STORAGE_CAPACITY_RANGE_TWH * 1_000
+
 app = FastAPI(title="Terna Energy Simulator API")
 
 _cors_origins_raw = os.getenv("CORS_ALLOW_ORIGINS", "*")
@@ -41,14 +47,24 @@ app.add_middleware(
 
 # ── Power data (loaded once at startup) ───────────────────────────────────────
 _power_data_2025: ElectricData | None = None
+_decarbonization_surface: list[tuple[float, float, float]] = []
+_decarbonization_surface_signature: tuple[float, float, float, float, float] | None = None
+_decarbonization_surface_lock = Lock()
 
 @app.on_event("startup")
 async def _load_power_data():
-    """Load power data from NPZ file once at application startup."""
-    global _power_data_2025
+    """Load power data and the default decarbonization surface once at startup."""
+    global _power_data_2025, _decarbonization_surface, _decarbonization_surface_signature
     _power_data_2025 = load_power_data_from_npz(NPZ_PATH)
     _power_data_2025.compute_energy()
+    _decarbonization_surface = utility.load_decarbonization_surface_from_csv(SURFACE_CSV_PATH)
+    _decarbonization_surface_signature = _surface_signature(
+        DEFAULT_K_PV_RANGE,
+        DEFAULT_K_W_RANGE,
+        _DEFAULT_STORAGE_CAPACITY_RANGE_GWH,
+    )
     print(f"✓ Power data (2025) loaded from {NPZ_PATH}")
+    print(f"✓ Decarbonization surface ({len(_decarbonization_surface)} points) loaded from {SURFACE_CSV_PATH}")
 
 # ── Immutable defaults (captured once at startup) ─────────────────────────────
 _DEFAULTS: dict[str, float] = {
@@ -283,6 +299,20 @@ def _get_power_data_copy() -> ElectricData:
     )
 
 
+def _surface_signature(
+        k_pv_range: float,
+        k_w_range: float,
+        capacity_range: float) -> tuple[float, float, float, float, float]:
+    """Return the inputs that affect a decarbonization surface calculation."""
+    return (
+        _config["ETA_CHARGE"],
+        _config["ETA_DISCHARGE"],
+        k_pv_range,
+        k_w_range,
+        capacity_range,
+    )
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/parameters")
@@ -353,6 +383,21 @@ class SimulationRequest(BaseModel):
         return v
 
 
+class DecarbonizationCostRequest(BaseModel):
+    k_pv_range: float = Field(default=DEFAULT_K_PV_RANGE, ge=1.0, le=100.0)
+    k_w_range: float = Field(default=DEFAULT_K_W_RANGE, ge=1.0, le=100.0)
+    storage_capacity_range_twh: float = Field(
+        default=DEFAULT_STORAGE_CAPACITY_RANGE_TWH, ge=0.001, le=100.0
+    )
+
+    @field_validator("k_pv_range", "k_w_range", "storage_capacity_range_twh")
+    @classmethod
+    def range_fields_must_be_finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("Range must be a finite number.")
+        return v
+
+
 @app.get("/api/current-scenario")
 def get_current_scenario():
     _apply_config()
@@ -394,6 +439,44 @@ def run_simulation(req: SimulationRequest):
     }
 
 
+@app.post("/api/decarbonization-surface")
+def get_decarbonization_surface(req: DecarbonizationCostRequest):
+    """Calculate costs using the cached or newly computed decarbonization surface."""
+    global _decarbonization_surface, _decarbonization_surface_signature
+
+    _apply_config()
+    capacity_range = req.storage_capacity_range_twh * 1_000
+    signature = _surface_signature(req.k_pv_range, req.k_w_range, capacity_range)
+
+    with _decarbonization_surface_lock:
+        surface_recalculated = signature != _decarbonization_surface_signature
+        if surface_recalculated:
+            power_data = _get_power_data_copy()
+            _decarbonization_surface = sim_module.compute_decarbonization_surface(
+                power_data,
+                req.k_pv_range,
+                req.k_w_range,
+                capacity_range,
+            )
+            _decarbonization_surface_signature = signature
+        decarbonization_surface = list(_decarbonization_surface)
+
+    power_data = _get_power_data_copy()
+    points = sim_module.compute_decarbonization_costs(power_data, decarbonization_surface)
+    return {
+        "surface_recalculated": surface_recalculated,
+        "points": [
+            {
+                "k_pv": k_pv,
+                "k_w": k_w,
+                "storage_capacity": storage_capacity,
+                "cost": cost,
+            }
+            for k_pv, k_w, storage_capacity, cost in points
+        ]
+    }
+
+
 # ── Static frontend (production) ──────────────────────────────────────────────
 # When the React app has been built (frontend/dist exists), serve it from the
 # same origin as the API so no CORS or proxy configuration is needed.
@@ -417,26 +500,3 @@ if _FRONTEND_DIST.exists():
         StaticFiles(directory=str(_FRONTEND_DIST), html=True),
         name="frontend",
     )
-
-
-@app.post("/api/decarbonization-surface")
-def get_decarbonization_surface():
-    """Calculate costs for the saved decarbonization surface."""
-    _apply_config()
-    power_data = _get_power_data_copy()
-    decarbonization_surface = utility.load_decarbonization_surface_from_csv(
-        SURFACE_CSV_PATH
-    )
-    points = sim_module.compute_decarbonization_costs(power_data, decarbonization_surface)
-    utility.plot_decarbonization_surface(points, show=False)
-    return {
-        "points": [
-            {
-                "k_pv": k_pv,
-                "k_w": k_w,
-                "storage_capacity": storage_capacity,
-                "cost": cost,
-            }
-            for k_pv, k_w, storage_capacity, cost in points
-        ]
-    }

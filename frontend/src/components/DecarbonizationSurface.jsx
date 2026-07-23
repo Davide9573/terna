@@ -28,9 +28,9 @@ export default function DecarbonizationSurface({ points }) {
 
   const layout = {
     scene: {
-      xaxis: { title: 'Fattore k_pv' },
-      yaxis: { title: 'Fattore k_w' },
-      zaxis: { title: 'Accumulo minimo (TWh)' },
+      xaxis: { title: { text: 'moltiplicatore potenza PV' } },
+      yaxis: { title: { text: 'moltiplicatore potenza eolica' } },
+      zaxis: { title: { text: 'capacità di accumulo (TWh)' } },
       camera: { eye: { x: 1.5, y: 1.5, z: 1.05 } },
     },
     margin: { l: 0, r: 0, t: 20, b: 0 },

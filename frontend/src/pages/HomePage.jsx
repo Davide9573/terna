@@ -12,9 +12,9 @@ export default function HomePage() {
   return (
     <div className="page">
       <header className="app-header">
-        <h1>Decarbonizzare il sistema di generazione dell'energia elettrica italiano è possibile?<br />
-          In che modo? E a quale costo?</h1>
-        <p className="subtitle">Analisi degli scenari alternativi — dati TERNA 2025</p>
+        <h1>Decarbonizzare la produzione elettrica italiana è possibile?
+          Anche senza ricorso al nucleare? E a quale costo?</h1>
+        <p className="subtitle">Analisi degli scenari alternativi a quello attuale — dati TERNA 2025</p>
       </header>
 
       <main className="content">
@@ -29,16 +29,16 @@ export default function HomePage() {
             di trasmissione nazionale (<a href="https://www.terna.it" target="_blank" rel="noopener noreferrer">www.terna.it</a>).<br />
           </p>
           <p>
-            Nel recente passato, il dibattito pubblico ha spesso posto l'accento sulla necessità di incrementare
+            Il dibattito pubblico pone spesso l'accento sulla necessità di incrementare
             la produzione di energia elettrica da fonti rinnovabili.
-            Politici, ambientalisti ed eminenti scienziati hanno sostenuto che l'Italia potrebbe raggiungere
+            Politici, ambientalisti ed eminenti scienziati sostengono che l'Italia potrebbe raggiungere
             l'autosufficienza energetica e la completa eliminazione delle fonti fossili (carbone, gas, olio
             combustibile), semplicemente aumentando la potenza installata di fotovoltaico ed eolico,
-            e incrementando la capacità di accumulo.
+            e incrementando al contempo la capacità di accumulo.
           </p>
           <p>
             Questo strumento consente, in modo grossolano ma efficace, di verificare se tali affermazioni
-            siano realistiche, e a quale costo.
+            siano realistiche.
           </p>
         </div>
 
@@ -47,16 +47,9 @@ export default function HomePage() {
           <h2>Come usare lo strumento</h2>
           <p>
             Premendo uno dei tre bottoni sottostanti l'applicativo consentirà di:<br />
-            - modificare a proprio piacimento i parametri fisici ed economici che influenzano le simulazioni;<br />
+            - modificare a proprio piacimento i parametri fisici ed economici che influenzano tutte le simulazioni;<br />
             - simulare scenari che prevedono un differente mix di fonti energetiche;<br />
-            - esplorare lo spazio degli scenari "a emissioni zero", confrontandone i costi.<br />
-          </p>
-          <p>
-            Sotto ancora sono presentati i risultati dello scenario di riferimento, basato sui dati ufficiali del 2025:<br />
-            - il grafico interattivo (in cui è possibile fare zoom e pan) della distribuzione della potenza consumata,
-            importata e generata, suddivisa per fonte;<br />
-            - il prospetto tabulare, sempre suddiviso per fonte, dell'energia complessiva nel periodo di riferimento
-            (il 2025), dei relativi costi livellati (LCOE/LCOS), e dei picchi di potenza.
+            - esplorare lo spazio degli scenari "a emissioni zero", con e senza ricorso al nucleare, confrontandone i costi.<br />
           </p>
         </div>
 
@@ -89,10 +82,18 @@ export default function HomePage() {
         {currentScenario && (
           <section className="results-section">
             <h2>Scenario di riferimento — dati reali 2025</h2>
+            <p>
+              Di seguito il grafico della distribuzione della potenza consumata, importata e generata, suddivisa per fonte.<br />
+              Il grafico è interattivo: è possibile fare pan e zoom per esplorare i dettagli della distribuzione.<br />
+            </p>
             <PowerChart
               chartData={currentScenario.chart}
               title="Bilancio energetico 2025 — Scenario di riferimento"
             />
+            <p>
+              Qui sotto il prospetto tabulare, sempre suddiviso per fonte, dell'energia complessiva nel periodo di riferimento,
+              dei relativi costi livellati (LCOE/LCOS), e dei picchi di potenza.
+            </p>
             <SummaryTable
               energy={currentScenario.energy}
               peaks={currentScenario.chart.peaks}

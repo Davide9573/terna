@@ -89,6 +89,32 @@ def simulate_power_redistribution(
         new_power_item["Thermal"] = 0  # Set the thermal production to 0, as it is now included in the nuclear production
     return (new_power_item, capacity)
 
+def compute_costs(data: ElectricData) -> dict[str, float]:
+    """
+    Compute the costs of an energy data set, considering the costs of each source.
+    The function returns a dictionary with the costs for each source and the total cost.
+
+    Parameters
+    ---------
+    data : ElectricData
+        Energy data set, containing the energy produced by each source (in GWh).
+
+    Returns
+    -------
+    dict[str, float]
+        Dictionary with the costs for each source and the total cost.
+    """
+    costs: dict[str, float] = {}
+    total_cost = 0.0
+    for source in SOURCE_COSTS:
+        cost = 0.0
+        if source in data.energy_item:
+            cost = data.energy_item[source][1]
+        costs[source] = cost
+        total_cost += cost
+    costs["Total"] = total_cost
+    return costs
+
 def compute_differential_costs(data1: ElectricData, data2: ElectricData) -> dict[str, float]:
     """
     Compute the differential costs between two energy data sets, considering the costs of each source.
@@ -327,13 +353,15 @@ def compute_decarbonization_surface(
     return results
 
 def compute_decarbonization_costs(
-        power_in: ElectricData,
+        ref_data: ElectricData,
         decarbonization_surface: list[tuple[float, float, float]]) -> list[tuple[float, float, float, float]]:
     """
     Compute the costs of decarbonization for each point in the decarbonization surface.
 
     Parameters
     ----------
+    ref_data : ElectricData
+        Reference electric power data, divided by type (for each quarter hour, in GW).
     decarbonization_surface : list[tuple[float, float, float]]
         List of tuples with (k_pv_factor, k_w_factor, storage_capacity).
 
@@ -344,7 +372,7 @@ def compute_decarbonization_costs(
     """
     results: list[tuple[float, float, float, float]] = []
     for k_pv, k_w, capacity in decarbonization_surface:
-        scenario = simulate_alternative_scenario(power_in, capacity, k_pv, k_w, nuke=False)
-        costs = compute_differential_costs(power_in, scenario)["Total"]
+        sim_data = simulate_alternative_scenario(ref_data, capacity, k_pv, k_w, nuke=False)
+        costs = compute_costs(sim_data)["Total"]
         results.append((k_pv, k_w, capacity, costs))
     return results

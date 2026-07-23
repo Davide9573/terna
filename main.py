@@ -36,7 +36,6 @@ if __name__ == "__main__":
     output_data(simulated_data, title)
 
     # Compute and print the additional costs and of the simulated scenario compared to the original one
-    print("\nAdditional costs of the simulated scenario compared to the original one:")
     power_data.compute_energy()
     utility.print_differential_costs(power_data, simulated_data)
 

@@ -32,8 +32,8 @@ start "TERNA Backend" cmd /k "cd /d %~dp0 && .venv\Scripts\uvicorn backend.api:a
 :: Breve attesa per dare tempo al backend di avviarsi
 timeout /t 3 /nobreak >nul
 
-echo [2/2] Avvio frontend Vite su http://localhost:5173 ...
-start "TERNA Frontend" cmd /k "cd /d %FRONTEND_DIR% && npm run dev"
+echo [2/2] Avvio frontend Vite su http://localhost:5174 ...
+start "TERNA Frontend" cmd /k "cd /d %FRONTEND_DIR% && npm run dev -- --strictPort"
 
 :: Attesa per dare tempo al frontend di avviarsi completamente
 timeout /t 4 /nobreak >nul
@@ -44,7 +44,7 @@ start http://localhost:5174/
 echo.
 echo Entrambi i server sono stati avviati in finestre separate.
 echo   Backend:  http://localhost:8000
-echo   Frontend: http://localhost:5173
+echo   Frontend: http://localhost:5174
 echo   Browser:  http://localhost:5174/
 echo   API docs: http://localhost:8000/docs
 echo.

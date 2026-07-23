@@ -471,9 +471,9 @@ def plot_decarbonization_surface(
         s=30,
     )
     fig.colorbar(points_scatter, ax=ax, shrink=0.7, pad=0.1, label='Costs (b€/year)')
-    ax.set_xlabel('minimum PV power multiplicator')
-    ax.set_ylabel('minimum wind power multiplicator')
-    ax.set_zlabel('minimum storage capacity (TWh)')
+    ax.set_xlabel('PV power multiplier')
+    ax.set_ylabel('wind power multiplier')
+    ax.set_zlabel('storage capacity (TWh)')
     ax.set_title('Decarbonization Surface\n' \
                  'Minimum (k_pv, k_w, C) needed to decarbonize\n' \
                  'the Italian electricity generation system without nuclear power,\n' \
@@ -531,9 +531,11 @@ def print_differential_costs(data1: ElectricData, data2: ElectricData) -> None:
         the energy data for the simulated scenario.
     """
 
-    print("-" * 60)
-    print(f"{'Source':<18} {'Additional Cost (G€)':>20}")
-    print("-" * 60)
+    print("-" * 93)
+    print("Levelized costs (G€/year) of the simulated scenario compared to the reference one")
+    print("-" * 93)
+    print(f"{'Source':<18} {'Ref Scenario':>18} {'Simulated One':>18} {'Additional Costs':>20}")
+    print("-" * 93)
     total_diff = 0.0
     for source in SOURCES:
         diff = 0.0
@@ -542,7 +544,7 @@ def print_differential_costs(data1: ElectricData, data2: ElectricData) -> None:
         if source in data2.energy_item:
             diff += data2.energy_item[source][1]
         total_diff += diff
-        print(f"{source:<18} {diff:>20.2f}")
-    print("-" * 60)
-    print(f"{'Total':<18} {total_diff:>20.2f}")
-    print("-" * 60)
+        print(f"{source:<18} {data1.energy_item[source][1]:>18.2f} {data2.energy_item[source][1]:>18.2f} {diff:>20.2f}")
+    print("-" * 93)
+    print(f"{'Total':<18} {sum(data1.energy_item[source][1] for source in SOURCES):>18.2f} {sum(data2.energy_item[source][1] for source in SOURCES):>18.2f} {total_diff:>20.2f}")
+    print("-" * 93)
