@@ -158,9 +158,14 @@ export default function CostAnalysisPage() {
             Modificare l'intervallo dei parametri da esplorare, e ricalcolare la superficie e i costi. <br />
             Attenzione: il ricalcolo può impiegare alcuni minuti, a seconda dell'intervallo dei parametri selezionato.
           </p>
-          <button className="btn btn-primary" onClick={calculateCosts} disabled={loading}>
-            {loading ? 'Calcolo in corso...' : 'Ricalcola superficie e costi'}
-          </button>
+          <div className="actions-row">
+            <button className="btn btn-primary" onClick={calculateCosts} disabled={loading}>
+              {loading ? 'Calcolo in corso...' : 'Ricalcola superficie e costi'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/conclusions')}>
+              Vai alle conclusioni
+            </button>
+          </div>
         </section>
 
         <section className="results-section">
