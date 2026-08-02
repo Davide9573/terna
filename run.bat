@@ -7,14 +7,29 @@ set "FRONTEND_DIR=%~dp0frontend"
 echo === Simulatore Energetico TERNA 2025 ===
 echo.
 
-:: Check Node.js
-for /f "delims=" %%I in ('where.exe node 2^>nul') do (
-    set "NODE_EXE=%%~fI"
-    goto :node_found
+:: Individua Node.js anche quando non e' nel PATH.
+set "NODE_EXE="
+for %%I in (
+    "%~dp0..\nodejs\node.exe"
+    "%~dp0nodejs\node.exe"
+    "%ProgramFiles%\nodejs\node.exe"
+    "%ProgramFiles(x86)%\nodejs\node.exe"
+    "%LocalAppData%\Programs\nodejs\node.exe"
+) do (
+    if not defined NODE_EXE if exist "%%~fI" set "NODE_EXE=%%~fI"
 )
 
-echo [ERRORE] Node.js non trovato nel PATH di sistema.
-echo         Installare Node.js e assicurarsi che la sua cartella sia nel PATH.
+if not defined NODE_EXE (
+    for /f "delims=" %%I in ('where.exe node 2^>nul') do (
+        if not defined NODE_EXE set "NODE_EXE=%%~fI"
+    )
+)
+
+if defined NODE_EXE goto :node_found
+
+echo [ERRORE] Node.js non trovato.
+echo         Cercato accanto al progetto e nelle cartelle di installazione standard.
+echo         Installare Node.js oppure collocare node.exe in ..\nodejs.
 pause
 exit /b 1
 
@@ -39,7 +54,7 @@ start "TERNA Backend" cmd /k "cd /d %~dp0 && .venv\Scripts\uvicorn backend.api:a
 timeout /t 3 /nobreak >nul
 
 echo [2/2] Avvio frontend Vite su http://localhost:5174 ...
-start "TERNA Frontend" cmd /k "cd /d %FRONTEND_DIR% && npm run dev -- --strictPort"
+start "TERNA Frontend" /d "%FRONTEND_DIR%" cmd /k ""%NODE_DIR%npm.cmd" run dev -- --strictPort"
 
 :: Attesa per dare tempo al frontend di avviarsi completamente
 timeout /t 4 /nobreak >nul
