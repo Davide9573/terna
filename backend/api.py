@@ -75,7 +75,8 @@ _DEFAULTS: dict[str, float] = {
     "PV_LCOE":                  params_module.PV_LCOE,
     "WIND_LCOE":                params_module.WIND_LCOE,
     "NUKE_LCOE":                params_module.NUKE_LCOE,
-    "LCOS":                     params_module.LCOS,
+    "STORAGE_CAPACITY_COST":    params_module.STORAGE_CAPACITY_COST,
+    "STORAGE_VARIABLE_COST":    params_module.STORAGE_VARIABLE_COST,
     "IMPORT_COST":              params_module.IMPORT_COST,
 }
 
@@ -88,7 +89,7 @@ _SOURCE_COST_MAP = {
     "PV_LCOE":      "Photovoltaic",
     "WIND_LCOE":    "Wind",
     "NUKE_LCOE":    "Nuclear",
-    "LCOS":         "Storage",
+    "STORAGE_VARIABLE_COST": "Storage",
     "IMPORT_COST":  "Net Import",
 }
 
@@ -168,17 +169,28 @@ PARAM_METADATA = {
             "ma garantisce continuità di fornitura (dispatchability)."
         ),
     },
-    "LCOS": {
-        "label": "LCOS – Costo livellato dell'accumulo",
-        "unit": "€/MWh",
+    "STORAGE_CAPACITY_COST": {
+        "label": "Costo annuo della capacità di accumulo",
+        "unit": "€/MWh-capacità/anno",
         "description": (
-            "Costo livellato dello stoccaggio energetico (Levelized Cost of Storage). "
-            "Rappresenta il costo per ogni MWh immagazzinato e rilasciato nel ciclo di vita del sistema."
+            "Costo annuo della capacità utilizzabile installata, applicato anche quando "
+            "l'accumulo non viene scaricato."
         ),
         "rationale": (
-            "Fonte: PNNL Energy Storage Cost Performance – "
-            "https://www.pnnl.gov/projects/esgc-cost-performance/lcos-estimates. "
-            "Include batterie, pompaggio idroelettrico e altri vettori."
+            "Default: batteria agli ioni di litio su scala di rete e durata di quattro ore. "
+            "Include CAPEX annualizzato, sostituzioni e O&M fisso; 1 TWh costa 40 G€/anno."
+        ),
+    },
+    "STORAGE_VARIABLE_COST": {
+        "label": "Costo variabile di scarica dell'accumulo",
+        "unit": "€/MWh",
+        "description": (
+            "Costo operativo incrementale per ogni MWh rilasciato dall'accumulo, escluso "
+            "il capitale della capacità installata."
+        ),
+        "rationale": (
+            "Default zero: il costo capitale e l'O&M fisso sono già nel parametro di capacità. "
+            "L'energia di carica resta contabilizzata nella fonte che la genera."
         ),
     },
     "IMPORT_COST": {
@@ -203,7 +215,8 @@ _PARAM_BOUNDS: dict[str, tuple[float, float]] = {
     "PV_LCOE": (0.0, 2_000.0),
     "WIND_LCOE": (0.0, 2_000.0),
     "NUKE_LCOE": (0.0, 2_000.0),
-    "LCOS": (0.0, 2_000.0),
+    "STORAGE_CAPACITY_COST": (0.0, 200_000.0),
+    "STORAGE_VARIABLE_COST": (0.0, 2_000.0),
     "IMPORT_COST": (0.0, 2_000.0),
 }
 
@@ -267,8 +280,9 @@ def _power_data_to_dict(data: ElectricData) -> dict:
 
 
 def _energy_to_dict(data: ElectricData) -> dict:
+    """Serialize internal GWh energy values as TWh for the frontend."""
     return {
-        key: {"energy": float(energy_value), "cost": float(cost_value)}
+        key: {"energy": float(energy_value / 1_000), "cost": float(cost_value)}
         for key, (energy_value, cost_value) in data.energy_item.items()
     }
 

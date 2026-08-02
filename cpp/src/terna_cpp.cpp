@@ -55,6 +55,7 @@ struct SimulationParameters {
     double eta_charge;
     double eta_discharge;
     double nuclear_base_load_factor;
+    double storage_capacity_cost;
     std::unordered_map<std::string, double> source_costs;
 };
 
@@ -368,6 +369,7 @@ SimulationParameters parse_parameters(const py::dict& parameters) {
         .eta_charge = get_double("ETA_CHARGE"),
         .eta_discharge = get_double("ETA_DISCHARGE"),
         .nuclear_base_load_factor = get_double("NUCLEAR_BASE_LOAD_FACTOR"),
+        .storage_capacity_cost = get_double("STORAGE_CAPACITY_COST"),
         .source_costs = {},
     };
     if (parameters.contains("SOURCE_COSTS")) {
@@ -614,10 +616,11 @@ py::dict run_costs(const py::dict& series, double storage_capacity, double durat
                 energy += value;
             }
         }
-        energy /= 4000.0;
-        const double cost = source == Storage
-            ? storage_capacity * kMwhPerGwh * unit_cost * annualization * kGeurPerEur
-            : energy * kMwhPerGwh * unit_cost * annualization * kGeurPerEur;
+        energy /= 4.0;
+        double cost = energy * kMwhPerGwh * unit_cost * annualization * kGeurPerEur;
+        if (source == Storage) {
+            cost += storage_capacity * kMwhPerGwh * parameters.storage_capacity_cost * kGeurPerEur;
+        }
         result[py::str(kSources[source])] = py::make_tuple(energy, cost);
         total += cost;
     }

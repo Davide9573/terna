@@ -325,23 +325,30 @@ The result is a new `PowerData` that shows the modified mix: reduced (or zeroed)
 
 ### Cost Computation
 
-The function computes the cost difference of the simulated scenario with respect to the real one.  
-Generally, the simulated scenario entails additional costs due to increased photovoltaic, wind and nuclear power and, above all, increased storage capacity.
-On the other hand, savings are also achieved by reducing thermal energy production and net energy imports.
-The costs are computed taking into account:
-- Levelized Costs of Electricity (LCOE) for the different power sources, from https://www.eia.gov/outlooks/aeo/electricity_generation/pdf/LCOE_report.pdf
-- Levelized Costs of Storage (LCOS), the counterpoart to LCOE, from https://www.pnnl.gov/projects/esgc-cost-performance/lcos-estimates
-- The price Italy pays for imported electricity (about $5.6 billion in 2024) divided by the imported amount of electrical energy (about 58.3 TWh on the same year), from https://wits.worldbank.org/trade/comtrade/en/country/ITA/year/2024/tradeflow/Imports/partner/ALL/product/271600
+The function computes the annualised cost difference of the simulated scenario with respect to the real one. All costs are expressed in 2024 euros and are annualised to the simulated period. The model uses a consistent Italian/European baseline for new capacity: plant-level costs, before taxes, transmission/distribution, and wider system-integration costs.
 
-| Source | Assumed Cost [$/MWh] | Description |
-|---|---|---|
-| Net Import | 96.05 | Average price of imported electricity |
-| Thermal | 58.47 | LCOE for large-scale thermoelectric plants (natural gas combined-cycle) |
-| Nuclear | 87.81 | LCOE for nuclear plants |
-| Photovoltaic | 40.38 | LCOE for large-scale photovoltaic plants |
-| Wind | 58.33 | LCOE for wind turbines (a mix of offshore and onshore installations) |
-| Storage | 35.30 | LCOS for a mix of hydro-pump systems and electrochemical batteries |
-||||
+LCOE is useful for comparing the lifetime cost of generation but does not measure system value, dispatchability, or balancing requirements. It must therefore be interpreted together with the time-series simulation, rather than as a complete electricity-system cost. The generation values are central estimates based on the [IEA/NEA Projected Costs of Generating Electricity](https://www.iea.org/reports/projected-costs-of-generating-electricity-2020) and [IRENA Renewable Power Generation Costs in 2023](https://www.irena.org/Publications/2024/Sep/Renewable-Power-Generation-Costs-in-2023), adjusted to Italian conditions. They are deliberately configurable through the API.
+
+| Source | Assumed cost | Unit | Assumption |
+|---|---:|---|---|
+| Net Import | 89 | €/MWh | 2024 Italian gross-import unit value |
+| Thermal | 110 | €/MWh | Natural-gas combined-cycle generation, representative of the Italian thermal fleet |
+| Nuclear | 160 | €/MWh | New European nuclear build; no Italian operating fleet exists |
+| Photovoltaic | 55 | €/MWh | Italian utility-scale photovoltaic project |
+| Wind | 70 | €/MWh | Italian onshore wind project; offshore is excluded |
+| Self-consumption | 85 | €/MWh | Distributed behind-the-meter photovoltaic generation, not avoided retail expenditure |
+| Hydro | 95 | €/MWh | New hydropower project; highly site-specific |
+| Geothermal | 90 | €/MWh | New high-enthalpy geothermal project; highly site-specific |
+| Storage capacity | 40,000 | €/MWh-capacity/year | Annualised grid-scale lithium-ion battery CAPEX, replacements and fixed O&M |
+| Storage discharge | 0 | €/MWh discharged | Variable operating cost; charging energy is already priced in the generation source |
+
+The import value is derived from [WITS/UN Comtrade](https://wits.worldbank.org/trade/comtrade/en/country/ITA/year/2024/tradeflow/Imports/partner/ALL/product/271600): $5.6022 billion of electrical-energy imports and 58.3145 TWh in 2024, or $96.07/MWh. Converted using the 2024 ECB average exchange rate of $1.0824 per euro, this is €88.8/MWh, rounded to €89/MWh. Terna reports 55.9 TWh of gross imports and 51.0 TWh of net imports in 2024; the small quantity difference reflects different statistical reporting boundaries.
+
+Storage needs a separate treatment. The [PNNL LCOS methodology](https://www.pnnl.gov/projects/esgc-cost-performance/lcos-estimates) defines LCOS as a cost per unit of discharged energy throughput and includes capital, replacement and O&M assumptions. Applying such a figure only to discharged energy would make a large but underused store artificially cheap. The simulator therefore uses two non-overlapping terms:
+
+$$C_{storage} = E_{capacity} \times 40{,}000\ \frac{EUR}{MWh_{capacity}\cdot year} + E_{discharged} \times 0\ \frac{EUR}{MWh}$$
+
+The first term is incurred regardless of utilisation and represents annualised CAPEX, replacement and fixed O&M for a four-hour grid-scale lithium-ion battery. Thus, 1 TWh of capacity costs 40 G€/year even with zero discharge. The second term is available for non-capital variable O&M; its default is zero. Charging energy is excluded to avoid double counting because it is already costed as generation from the source that charged the storage.
 
 <div align="center">
   <img src="Simulated_Scenario_Additional_Costs.png" alt="Immagine" width="500">

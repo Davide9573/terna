@@ -1,5 +1,12 @@
 from dataclasses import dataclass, field
-from parameters import SOURCE_COLORS, SOURCE_COSTS, SOURCES, OTHER_POWER_ITEMS, OTHER_POWER_ITEM_COLORS
+from parameters import (
+    OTHER_POWER_ITEMS,
+    OTHER_POWER_ITEM_COLORS,
+    SOURCE_COLORS,
+    SOURCE_COSTS,
+    SOURCES,
+    STORAGE_CAPACITY_COST,
+)
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -7,6 +14,7 @@ import native_simulator
 
 MWH_PER_GWH = 1_000
 GEUR_PER_EUR = 1e-9
+SAMPLE_INTERVAL_HOURS = 0.25
 
 
 @dataclass
@@ -44,26 +52,25 @@ class ElectricData:
         for key in SOURCES:
             energy_value = 0.0
             if key in self.power_item:
-                energy_value = np.nansum(self.power_item[key]) / 4000
+                energy_value = np.nansum(self.power_item[key]) * SAMPLE_INTERVAL_HOURS
+            cost_value = (
+                energy_value * MWH_PER_GWH * SOURCE_COSTS[key]
+                * k_year * GEUR_PER_EUR
+            )
             if key == "Storage":
-                cost_value = (
-                    self.storage_capacity * MWH_PER_GWH * SOURCE_COSTS[key]
-                    * k_year * GEUR_PER_EUR
-                )
-            else:
-                cost_value = (
-                    energy_value * MWH_PER_GWH * SOURCE_COSTS[key]
-                    * k_year * GEUR_PER_EUR
+                cost_value += (
+                    self.storage_capacity * MWH_PER_GWH * STORAGE_CAPACITY_COST
+                    * GEUR_PER_EUR
                 )
             self.energy_item[key] = (energy_value, cost_value)
         self.energy_item["Total Production"] = (
             np.nansum([self.energy_item[key][0] for key in SOURCES]),
             np.nansum([self.energy_item[key][1] for key in SOURCES]),
         )
-        consumed_energy = np.nansum(self.power_item["Consumption"]) / 4000
+        consumed_energy = np.nansum(self.power_item["Consumption"]) * SAMPLE_INTERVAL_HOURS
         self.energy_item["Consumption"] = (consumed_energy, 0.0)
         if "Curtailment" in self.power_item:
-            curtailed_energy = np.nansum(self.power_item["Curtailment"]) / 4000
+            curtailed_energy = np.nansum(self.power_item["Curtailment"]) * SAMPLE_INTERVAL_HOURS
             self.energy_item["Curtailment"] = (curtailed_energy, 0.0)
         self.energy_item = dict(
             sorted(self.energy_item.items(), key=lambda item: item[1][0], reverse=True)
@@ -107,7 +114,7 @@ def normalize_to_daylight_saving_time(df: pd.DataFrame) -> pd.DataFrame:
 def load_generation_data_from_csv(csv_path: Path) -> ElectricData:
     """
     Read the CSV and return (dictionary { source: np.ndarray }, start timestamp).
-    
+
     Sources and time range are derived from the data itself.
     Missing intervals are filled with NaN.
     """
@@ -333,7 +340,7 @@ def merge_power_data(*datasets: ElectricData) -> ElectricData:
         all_keys: set[str] = set()
         for d in dicts:
             all_keys.update(d.keys())
-    
+
         # Global index (union of all present ranges)
         all_indices: list[pd.DatetimeIndex] = []
         for i, d in enumerate(dicts):
@@ -355,7 +362,7 @@ def merge_power_data(*datasets: ElectricData) -> ElectricData:
                     total = total.add(s, fill_value=0.0)
             result[key] = total.to_numpy(dtype=np.float64)
         return result
-    
+
     # Merge all poweritem of the dataset dictionaries, summing the duplicate keys
     merged_power_item = _merge_dicts([d.power_item for d in datasets])
 
@@ -522,7 +529,7 @@ def plot_decarbonization_surface(
 def print_power_data_summary(data: ElectricData) -> None:
     """
     Print a summary of the electric data to the console.
-    
+
     Parameters
     ----------
     data : ElectricData
@@ -539,18 +546,18 @@ def print_power_data_summary(data: ElectricData) -> None:
     print("-" * 93)
     for source in energy_data.energy_item.keys():
         if source in SOURCES and energy_data.energy_item[source][0] > 0:
-                print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peak[source][0]:>16.2f} {power_data.power_peak[source][1]:>20}")
+                print(f"{source:<18} {energy_data.energy_item[source][0] / MWH_PER_GWH:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peak[source][0]:>16.2f} {power_data.power_peak[source][1]:>20}")
 
     # Print the total energy production (sum of all sources) and curtailment, including respective maximum power peaks and time
     print("-" * 93)
-    print(f"{'Total Production':<18} {energy_data.energy_item['Total Production'][0]:>14.2f} {energy_data.energy_item['Total Production'][1]:>14.2f} {power_data.power_peak['Total Production'][0]:>16.2f} {power_data.power_peak['Total Production'][1]:>20}")
-    print(f"{'Curtailment':<18} {energy_data.energy_item['Curtailment'][0]:>14.2f} {'---':>14} {power_data.power_peak['Curtailment'][0]:>16.2f} {power_data.power_peak['Curtailment'][1]:>20}")
+    print(f"{'Total Production':<18} {energy_data.energy_item['Total Production'][0] / MWH_PER_GWH:>14.2f} {energy_data.energy_item['Total Production'][1]:>14.2f} {power_data.power_peak['Total Production'][0]:>16.2f} {power_data.power_peak['Total Production'][1]:>20}")
+    print(f"{'Curtailment':<18} {energy_data.energy_item['Curtailment'][0] / MWH_PER_GWH:>14.2f} {'---':>14} {power_data.power_peak['Curtailment'][0]:>16.2f} {power_data.power_peak['Curtailment'][1]:>20}")
 
     # Print the cumulative energy, the maximum peak, and the corresponding time, for each non-source power item
     print("-" * 93)
     for source in energy_data.energy_item.keys():
         if source in OTHER_POWER_ITEMS and energy_data.energy_item[source][0] > 0:
-            print(f"{source:<18} {energy_data.energy_item[source][0]:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peak[source][0]:>16.2f} {power_data.power_peak[source][1]:>20}")
+            print(f"{source:<18} {energy_data.energy_item[source][0] / MWH_PER_GWH:>14.2f} {energy_data.energy_item[source][1]:>14.2f} {power_data.power_peak[source][0]:>16.2f} {power_data.power_peak[source][1]:>20}")
     print("-" * 93)
 
 

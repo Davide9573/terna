@@ -78,7 +78,7 @@ flowchart TD
 
 ### 3.1 Unita e risoluzione
 
-Le serie `power_item` rappresentano potenze in GW. Con 15 minuti per campione, l'integrazione dell'energia usa la divisione per 4000, producendo GWh. I costi unitari sono espressi in €/MWh; i riepiloghi sono annualizzati sulla durata effettiva del dataset, convertiti da GWh a MWh e da euro a G€/anno. La capacita di accumulo richiesta dall'API di simulazione e espressa in GWh; nella ricerca della superficie l'interfaccia invia TWh e l'API li converte in GWh.
+Le serie `power_item` rappresentano potenze in GW. Con 15 minuti per campione, l'integrazione dell'energia usa la divisione per 4, producendo GWh. I costi unitari sono espressi in €/MWh; i riepiloghi sono annualizzati sulla durata effettiva del dataset, convertiti da GWh a MWh e da euro a G€/anno. L'API converte i valori energetici da GWh a TWh solo nella risposta destinata al frontend. La capacita di accumulo richiesta dall'API di simulazione e espressa in GWh; nella ricerca della superficie l'interfaccia invia TWh e l'API li converte in GWh.
 
 ## 4. Backend
 
@@ -210,7 +210,7 @@ Al termine del ciclo, se il nucleare e attivo, viene applicato un post-processin
 
 L'endpoint della superficie usa `compute_decarbonization_surface()`, che esplora una griglia di fattori PV/eolico. Per ogni combinazione, `compute_decarbonization_minimum_storage_capacity()` verifica la fattibilita e usa una bisezione per stimare il minimo accumulo necessario. Uno scenario e fattibile senza nucleare solo quando termico e import sono nulli in tutti gli intervalli.
 
-Il risultato puo essere oneroso, perche richiede molte simulazioni su un anno di campioni. Per questo l'API conserva i punti in memoria e protegge lettura/ricalcolo con `_decarbonization_surface_lock`. La cache e valida finche restano uguali rendimenti di carica/scarica e i tre range della richiesta; i costi vengono invece calcolati sulla superficie disponibile a ogni risposta, cosi che un aggiornamento di LCOE/LCOS/import si rifletta nei valori economici anche senza rigenerare la parte di fattibilita.
+Il risultato puo essere oneroso, perche richiede molte simulazioni su un anno di campioni. Per questo l'API conserva i punti in memoria e protegge lettura/ricalcolo con `_decarbonization_surface_lock`. La cache e valida finche restano uguali rendimenti di carica/scarica e i tre range della richiesta; i costi vengono invece calcolati sulla superficie disponibile a ogni risposta, cosi che un aggiornamento di LCOE, costo della capacità di accumulo o import si rifletta nei valori economici anche senza rigenerare la parte di fattibilita.
 
 ### 4.6 Aspetti trasversali del backend
 

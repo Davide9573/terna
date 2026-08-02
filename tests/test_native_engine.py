@@ -113,12 +113,25 @@ class CostUnitTests(unittest.TestCase):
 
         data.compute_energy()
 
-        thermal_energy_gwh = 3.0 / 1_000
+        thermal_energy_gwh = 3.0
         expected_cost_geur_per_year = (
             thermal_energy_gwh * 1_000 * parameters.THERMAL_LCOE * 365 * 1e-9
         )
-        self.assertEqual(parameters.THERMAL_LCOE, 65)
+        self.assertEqual(parameters.THERMAL_LCOE, 110)
+        self.assertEqual(data.energy_item["Thermal"][0], thermal_energy_gwh)
         self.assertAlmostEqual(data.energy_item["Thermal"][1], expected_cost_geur_per_year)
+
+    def test_storage_cost_includes_installed_capacity_independent_of_use(self):
+        data = make_data()
+        data.end = pd.Timestamp("2025-01-02T00:00:00")
+        data.storage_capacity = 10_000.0
+
+        data.compute_energy()
+
+        expected_cost_geur_per_year = (
+            data.storage_capacity * 1_000 * parameters.STORAGE_CAPACITY_COST * 1e-9
+        )
+        self.assertAlmostEqual(data.energy_item["Storage"][1], expected_cost_geur_per_year)
 
 
 if __name__ == "__main__":

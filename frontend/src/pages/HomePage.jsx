@@ -92,7 +92,7 @@ export default function HomePage() {
             />
             <p>
               Qui sotto il prospetto tabulare, sempre suddiviso per fonte, dell'energia complessiva nel periodo di riferimento,
-              dei relativi costi livellati (LCOE/LCOS), e dei picchi di potenza.
+              dei relativi costi annui e dei picchi di potenza.
             </p>
             <SummaryTable
               energy={currentScenario.energy}

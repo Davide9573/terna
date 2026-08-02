@@ -5,27 +5,39 @@ ETA_DISCHARGE = 0.9  # Discharge efficiency of the storage
 NUCLEAR_BASE_LOAD_FACTOR = 0.3  # Nuclear base load factor, assumed to be 30% of the peak power
 
 
-# LCOE values from https://www.eia.gov/outlooks/aeo/electricity_generation/pdf/LCOE_report.pdf
-# Notice that LCOE is limited because it only reflects the cost to build and operate a plant, not the value of the plant to the grid
-THERMAL_LCOE = 65  # Levelized cost of electricity for thermal power (€/MWh)
-PV_LCOE = 44  # Levelized cost of electricity for photovoltaic power (€/MWh)
-WIND_LCOE = 64  # Levelized cost of electricity for wind power (€/MWh)
-NUKE_LCOE = 95  # Levelized cost of electricity for nuclear power (€/MWh)
+# Italian/European 2024 cost baseline for new capacity, expressed in real €/MWh.
+# The values are central estimates, excluding network and wider system-integration costs.
+# LCOE is a plant-level metric and does not represent the value a technology provides to the grid.
+# Sources: IEA/NEA Projected Costs of Generating Electricity and IRENA Renewable Power
+# Generation Costs in 2023. Italian conditions inform the gas, solar and onshore-wind uplift.
+THERMAL_LCOE = 110  # Natural-gas combined-cycle generation, representative of Italy (€/MWh)
+PV_LCOE = 55  # Utility-scale photovoltaic generation in Italy (€/MWh)
+WIND_LCOE = 70  # Onshore wind generation in Italy; excludes offshore wind (€/MWh)
+NUKE_LCOE = 160  # New European nuclear build; Italy has no operating nuclear fleet (€/MWh)
 
-# from https://www.pv-magazine.it/2025/05/14/irex-annual-report-nel-2025-moduli-in-aumento-ma-operazioni-stabili/
-SELF_LCOE = 100  # Levelized cost of electricity for self-consumption (€/MWh)
+# Distributed photovoltaic generation behind the meter, not the avoided retail bill (€/MWh).
+SELF_LCOE = 85
 
-# European average LCOE values from https://renewablemarketwatch.com/blog/irenas-renewable-power-generation-costs-study-shows-renewable-energy-is-the-most-cost-effective-source-of-new-electricity-generation-in-2024/
-HYDRO_LCOE = 68  # Levelized cost of electricity for hydro power (€/MWh)
-GEOTHERMAL_LCOE = 98  # Levelized cost of electricity for geothermal power (€/MWh)
+# New projects: these technologies are highly site-specific, particularly in Italy (€/MWh).
+HYDRO_LCOE = 95
+GEOTHERMAL_LCOE = 90
 
-# LCOS, the levelized cost of the storage, counterpart to LCOE
-# LCOS values from https://www.pnnl.gov/projects/esgc-cost-performance/lcos-estimates
-LCOS = 388  # Levelized cost of storage (€/MWh)
+# Storage investment is modelled separately from its use to penalize unused capacity.
+# This central estimate represents a four-hour grid-scale lithium-ion battery: annualized CAPEX,
+# augmentation/replacement, and fixed O&M, expressed per MWh of installed usable capacity.
+# A 1 TWh installation therefore costs 40 G€/year even if it is never discharged.
+STORAGE_CAPACITY_COST = 40_000  # €/MWh-capacity/year
 
-# The price Italy pays, on average, for imported electricity
-# Values from https://wits.worldbank.org/trade/comtrade/en/country/ITA/year/2024/tradeflow/Imports/partner/ALL/product/271600
-IMPORT_COST = 106  # Cost of imported electricity (€/MWh)
+# Variable O&M per MWh discharged. The energy used to charge storage is already charged to its
+# generating source, so it is not included here. Keep this separate from LCOS to avoid counting
+# capital costs twice; LCOS normally spreads capital and O&M over assumed lifetime throughput.
+STORAGE_VARIABLE_COST = 0  # €/MWh discharged
+
+# 2024 Italian gross electricity-import unit value in €/MWh. WITS/Comtrade reports
+# USD 5.602 bn for 58.3145 TWh; converting 96.07 USD/MWh at the 2024 ECB average
+# EUR/USD rate (1.0824) gives 88.8 €/MWh, rounded to 89.
+# Source: https://wits.worldbank.org/trade/comtrade/en/country/ITA/year/2024/tradeflow/Imports/partner/ALL/product/271600
+IMPORT_COST = 89
 
 
 # List of power sources
@@ -36,7 +48,7 @@ SOURCE_COSTS = {
     "Net Import":       IMPORT_COST,
     "Thermal":          THERMAL_LCOE,
     "Nuclear":          NUKE_LCOE,
-    "Storage":          LCOS,
+    "Storage":          STORAGE_VARIABLE_COST,
     "Self-consumption": SELF_LCOE,
     "Hydro":            HYDRO_LCOE,
     "Wind":             WIND_LCOE,

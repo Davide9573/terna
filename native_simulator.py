@@ -31,6 +31,7 @@ def parameter_snapshot() -> dict:
         "ETA_CHARGE": parameters.ETA_CHARGE,
         "ETA_DISCHARGE": parameters.ETA_DISCHARGE,
         "NUCLEAR_BASE_LOAD_FACTOR": parameters.NUCLEAR_BASE_LOAD_FACTOR,
+        "STORAGE_CAPACITY_COST": parameters.STORAGE_CAPACITY_COST,
         "SOURCE_COSTS": dict(parameters.SOURCE_COSTS),
     }
 
