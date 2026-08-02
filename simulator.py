@@ -368,7 +368,7 @@ def compute_decarbonization_costs(
     Returns
     -------
     list[tuple[float, float, float, float]]
-        List of tuples with (k_pv_factor, k_w_factor, storage_capacity, additional_costs).
+        List of tuples with (k_pv_factor, k_w_factor, storage_capacity, costs).
     """
     results: list[tuple[float, float, float, float]] = []
     for k_pv, k_w, capacity in decarbonization_surface:
@@ -376,3 +376,29 @@ def compute_decarbonization_costs(
         costs = compute_costs(sim_data)["Total"]
         results.append((k_pv, k_w, capacity, costs))
     return results
+
+def compute_minimum_cost_scenario(decarbonization_costs: list[tuple[float, float, float, float]]) -> tuple[float, float, float, float]:
+    """
+    Compute the minimum cost scenario among those in the given decarbonization costs.
+
+    Parameters
+    ----------
+    decarbonization_costs : list[tuple[float, float, float, float]]
+        List of tuples with (k_pv_factor, k_w_factor, storage_capacity, costs).
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        Tuple with (k_pv_factor, k_w_factor, storage_capacity, minimum_costs).
+    """
+    min_cost = float("inf")
+    min_k_pv = 1.0
+    min_k_w = 1.0
+    min_capacity = 0.0
+    for k_pv, k_w, capacity, costs in decarbonization_costs:
+        if costs < min_cost:
+            min_cost = costs
+            min_k_pv = k_pv
+            min_k_w = k_w
+            min_capacity = capacity
+    return (min_k_pv, min_k_w, min_capacity, min_cost)
