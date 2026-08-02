@@ -3,6 +3,7 @@ from parameters import SOURCE_COLORS, SOURCE_COSTS, SOURCES, OTHER_POWER_ITEMS, 
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import native_simulator
 
 
 @dataclass
@@ -101,6 +102,14 @@ def load_generation_data_from_csv(csv_path: Path) -> ElectricData:
     Sources and time range are derived from the data itself.
     Missing intervals are filled with NaN.
     """
+    if native_simulator.use_cpp_engine():
+        generation, start, end = native_simulator.load_csv(str(csv_path), "generation")
+        return ElectricData(
+            power_item=generation,
+            start=pd.Timestamp(start),
+            end=pd.Timestamp(end),
+        )
+
     df = pd.read_csv(
         csv_path,
         encoding="utf-8-sig",
@@ -140,6 +149,14 @@ def load_consumption_data_from_csv(csv_path: Path) -> ElectricData:
     The time range is derived from the data itself.
     Missing intervals are filled with NaN.
     """
+    if native_simulator.use_cpp_engine():
+        consumption, start, end = native_simulator.load_csv(str(csv_path), "consumption")
+        return ElectricData(
+            power_item=consumption,
+            start=pd.Timestamp(start),
+            end=pd.Timestamp(end),
+        )
+
     df = pd.read_csv(
         csv_path,
         encoding="utf-8-sig",
@@ -175,6 +192,14 @@ def load_import_export_data_from_csv(csv_path: Path) -> ElectricData:
     Sources and time range are derived from the data itself.
     Missing intervals are filled with NaN.
     """
+    if native_simulator.use_cpp_engine():
+        import_export, start, end = native_simulator.load_csv(str(csv_path), "import_export")
+        return ElectricData(
+            power_item=import_export,
+            start=pd.Timestamp(start),
+            end=pd.Timestamp(end),
+        )
+
     df = pd.read_csv(
         csv_path,
         encoding="utf-8-sig",

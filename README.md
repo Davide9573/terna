@@ -101,6 +101,77 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Native C++ Backend on Windows
+
+The web application always uses the Python/FastAPI backend process. The simulation work can be delegated to the optional C++20 extension `_terna_cpp`, while the existing Python implementation remains available as a fallback.
+
+### Prerequisites
+
+- Python 3.11 or later and a project virtual environment in `.venv`
+- Node.js, required by `run.bat` for the Vite frontend
+- Visual Studio 2022 with the **Desktop development with C++** workload
+- The `VsDevCmd.bat` path configured in [build-native.bat](build-native.bat). The repository default is Visual Studio 2022 Professional. Update `VSDEVCMD` in that script when using a different edition or installation location.
+
+### Compile the extension
+
+Run these commands in PowerShell from the project root:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\build-native.bat
+```
+
+`requirements-dev.txt` installs the native build dependencies, namely CMake and `pybind11`. The build creates a Python extension compatible with the virtual environment interpreter at:
+
+```text
+build\python\Release\_terna_cpp.<python-abi>.pyd
+```
+
+For example, Python 3.13 on 64-bit Windows produces `_terna_cpp.cp313-win_amd64.pyd`. Re-run `build-native.bat` whenever the C++ files under `cpp/` change, or after changing Python versions.
+
+### Verify the native build
+
+Make the compiled extension visible to Python, select the native engine, and run the parity tests:
+
+```powershell
+$env:PYTHONPATH = "$PWD\build\python\Release;$env:PYTHONPATH"
+$env:TERNA_SIMULATION_ENGINE = "cpp"
+.venv\Scripts\python.exe -m unittest discover -s tests
+```
+
+The tests compare the Python and C++ implementations for a scenario simulation, daylight-saving-time CSV handling, and the decarbonization surface. A successful run reports `OK`.
+
+### Run the local webapp with C++ simulations
+
+In the same PowerShell session, after a successful build, run:
+
+```powershell
+$env:PYTHONPATH = "$PWD\build\python\Release;$env:PYTHONPATH"
+$env:TERNA_SIMULATION_ENGINE = "cpp"
+.\run.bat
+```
+
+`run.bat` starts FastAPI at `http://localhost:8000` and Vite at `http://localhost:5174`. It launches the backend in a child `cmd.exe` process, which inherits both environment variables from PowerShell. Therefore FastAPI remains Python-based, but CSV ingestion, scenario simulation, decarbonization surface calculation, and native cost calculation use `_terna_cpp`.
+
+To limit parallel work during the decarbonization-surface calculation, set a positive worker count before running the app. `0` uses the detected CPU concurrency:
+
+```powershell
+$env:TERNA_SURFACE_WORKERS = "4"
+```
+
+### Python fallback and troubleshooting
+
+Outside Docker, the default engine is Python. To explicitly use the fallback in a new terminal:
+
+```powershell
+$env:TERNA_SIMULATION_ENGINE = "python"
+.\run.bat
+```
+
+If the backend reports that `_terna_cpp` is unavailable, check that the build completed, that `PYTHONPATH` includes `build\python\Release`, and that the extension ABI matches `.venv\Scripts\python.exe`. The extension must be rebuilt after changing interpreter major/minor versions.
+
+The Docker image compiles the extension in a Linux build stage and sets `TERNA_SIMULATION_ENGINE=cpp` by default. The Windows `.pyd` artifact cannot be copied into or used by the Linux Docker image.
+
 ## Code execution
 
 ### Prepare the data

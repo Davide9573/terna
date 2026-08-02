@@ -6,6 +6,7 @@ from utility import ElectricData
 import numpy as np
 
 import utility
+import native_simulator
 
 def simulate_power_redistribution(
         power_item: dict[str, float],
@@ -172,6 +173,9 @@ def simulate_alternative_scenario(power_in: ElectricData, max_capacity: float, k
     ElectricData
         Updated electric power and energy data.
     """
+    if native_simulator.use_cpp_engine():
+        return native_simulator.simulate(power_in, max_capacity, k_pv, k_w, nuke)
+
     new_power_item: dict[str, np.ndarray] = {} # Dizionario per la produzione simulata
     N_INTERVALS = len(power_in.power_item["Photovoltaic"]) # Numero di intervalli temporali (quarti d'ora) nella simulazione
     for source in SOURCES + OTHER_POWER_ITEMS:
@@ -337,6 +341,11 @@ def compute_decarbonization_surface(
         - storage capacity (GWh)
         needed to decarbonize the electricity production without nuclear power.
     """
+    if native_simulator.use_cpp_engine():
+        return native_simulator.decarbonization_surface(
+            power_in, k_pv_range, k_w_range, capacity_range
+        )
+
     results: list[tuple[float, float, float]] = []
     k_pv_step = k_pv_range / 10.0  # Step size for the k_pv factor
     k_w_step = k_w_range / 10.0  # Step size for the k_w factor
