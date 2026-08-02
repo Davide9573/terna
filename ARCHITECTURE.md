@@ -78,7 +78,7 @@ flowchart TD
 
 ### 3.1 Unita e risoluzione
 
-Le serie `power_item` rappresentano potenze in GW. Con 15 minuti per campione, l'integrazione dell'energia usa la divisione per 4000, producendo GWh. I riepiloghi di costo sono annualizzati sulla durata effettiva del dataset e convertiti in GEUR/anno tramite il fattore `1e-6`. La capacita di accumulo richiesta dall'API di simulazione e espressa in GWh; nella ricerca della superficie l'interfaccia invia TWh e l'API li converte in GWh.
+Le serie `power_item` rappresentano potenze in GW. Con 15 minuti per campione, l'integrazione dell'energia usa la divisione per 4000, producendo GWh. I costi unitari sono espressi in €/MWh; i riepiloghi sono annualizzati sulla durata effettiva del dataset, convertiti da GWh a MWh e da euro a G€/anno. La capacita di accumulo richiesta dall'API di simulazione e espressa in GWh; nella ricerca della superficie l'interfaccia invia TWh e l'API li converte in GWh.
 
 ## 4. Backend
 

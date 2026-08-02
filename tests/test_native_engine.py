@@ -106,5 +106,20 @@ class NativeEngineParityTests(unittest.TestCase):
         np.testing.assert_allclose(actual, expected)
 
 
+class CostUnitTests(unittest.TestCase):
+    def test_costs_use_euro_per_mwh_and_return_geur_per_year(self):
+        data = make_data()
+        data.end = pd.Timestamp("2025-01-02T00:00:00")
+
+        data.compute_energy()
+
+        thermal_energy_gwh = 3.0 / 1_000
+        expected_cost_geur_per_year = (
+            thermal_energy_gwh * 1_000 * parameters.THERMAL_LCOE * 365 * 1e-9
+        )
+        self.assertEqual(parameters.THERMAL_LCOE, 65)
+        self.assertAlmostEqual(data.energy_item["Thermal"][1], expected_cost_geur_per_year)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 import native_simulator
 
+MWH_PER_GWH = 1_000
+GEUR_PER_EUR = 1e-9
+
 
 @dataclass
 class ElectricData:
@@ -43,9 +46,15 @@ class ElectricData:
             if key in self.power_item:
                 energy_value = np.nansum(self.power_item[key]) / 4000
             if key == "Storage":
-                cost_value = self.storage_capacity * SOURCE_COSTS[key] * k_year * 1e-6
+                cost_value = (
+                    self.storage_capacity * MWH_PER_GWH * SOURCE_COSTS[key]
+                    * k_year * GEUR_PER_EUR
+                )
             else:
-                cost_value = energy_value * SOURCE_COSTS[key] * k_year * 1e-6
+                cost_value = (
+                    energy_value * MWH_PER_GWH * SOURCE_COSTS[key]
+                    * k_year * GEUR_PER_EUR
+                )
             self.energy_item[key] = (energy_value, cost_value)
         self.energy_item["Total Production"] = (
             np.nansum([self.energy_item[key][0] for key in SOURCES]),

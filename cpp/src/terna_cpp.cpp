@@ -47,6 +47,8 @@ enum Source : std::size_t {
 };
 
 constexpr std::size_t source_count = kSources.size();
+constexpr double kMwhPerGwh = 1'000.0;
+constexpr double kGeurPerEur = 1e-9;
 using Series = std::array<std::vector<double>, source_count>;
 
 struct SimulationParameters {
@@ -614,8 +616,8 @@ py::dict run_costs(const py::dict& series, double storage_capacity, double durat
         }
         energy /= 4000.0;
         const double cost = source == Storage
-            ? storage_capacity * unit_cost * annualization * 1e-6
-            : energy * unit_cost * annualization * 1e-6;
+            ? storage_capacity * kMwhPerGwh * unit_cost * annualization * kGeurPerEur
+            : energy * kMwhPerGwh * unit_cost * annualization * kGeurPerEur;
         result[py::str(kSources[source])] = py::make_tuple(energy, cost);
         total += cost;
     }

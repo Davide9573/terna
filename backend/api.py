@@ -131,7 +131,7 @@ PARAM_METADATA = {
     },
     "THERMAL_LCOE": {
         "label": "LCOE Termico",
-        "unit": "€/GWh",
+        "unit": "€/MWh",
         "description": (
             "Costo livellato dell'energia elettrica da fonti termoelettriche (gas naturale, carbone). "
             "Include costi di costruzione, esercizio e combustibile."
@@ -143,7 +143,7 @@ PARAM_METADATA = {
     },
     "PV_LCOE": {
         "label": "LCOE Fotovoltaico",
-        "unit": "€/GWh",
+        "unit": "€/MWh",
         "description": "Costo livellato dell'energia elettrica da impianti fotovoltaici utility-scale.",
         "rationale": (
             "Fonte: EIA Annual Energy Outlook. Il PV è attualmente la fonte di nuova generazione "
@@ -152,13 +152,13 @@ PARAM_METADATA = {
     },
     "WIND_LCOE": {
         "label": "LCOE Eolico",
-        "unit": "€/GWh",
+        "unit": "€/MWh",
         "description": "Costo livellato dell'energia elettrica da impianti eolici onshore.",
         "rationale": "Fonte: EIA Annual Energy Outlook.",
     },
     "NUKE_LCOE": {
         "label": "LCOE Nucleare",
-        "unit": "€/GWh",
+        "unit": "€/MWh",
         "description": (
             "Costo livellato dell'energia elettrica da impianti nucleari. "
             "Include costi di costruzione (elevati), esercizio, combustibile e smaltimento rifiuti."
@@ -170,10 +170,10 @@ PARAM_METADATA = {
     },
     "LCOS": {
         "label": "LCOS – Costo livellato dell'accumulo",
-        "unit": "€/GWh",
+        "unit": "€/MWh",
         "description": (
             "Costo livellato dello stoccaggio energetico (Levelized Cost of Storage). "
-            "Rappresenta il costo per ogni GWh immagazzinato e rilasciato nel ciclo di vita del sistema."
+            "Rappresenta il costo per ogni MWh immagazzinato e rilasciato nel ciclo di vita del sistema."
         ),
         "rationale": (
             "Fonte: PNNL Energy Storage Cost Performance – "
@@ -183,7 +183,7 @@ PARAM_METADATA = {
     },
     "IMPORT_COST": {
         "label": "Costo medio importazione elettrica",
-        "unit": "€/GWh",
+        "unit": "€/MWh",
         "description": "Prezzo medio pagato dall'Italia per l'elettricità importata dall'estero.",
         "rationale": (
             "Fonte: World Bank WITS Comtrade data, media 2024 sulle importazioni italiane "
@@ -199,12 +199,12 @@ _PARAM_BOUNDS: dict[str, tuple[float, float]] = {
     "ETA_CHARGE": (0.0, 1.0),
     "ETA_DISCHARGE": (0.0, 1.0),
     "NUCLEAR_BASE_LOAD_FACTOR": (0.0, 1.0),
-    "THERMAL_LCOE": (0.0, 2_000_000.0),
-    "PV_LCOE": (0.0, 2_000_000.0),
-    "WIND_LCOE": (0.0, 2_000_000.0),
-    "NUKE_LCOE": (0.0, 2_000_000.0),
-    "LCOS": (0.0, 2_000_000.0),
-    "IMPORT_COST": (0.0, 2_000_000.0),
+    "THERMAL_LCOE": (0.0, 2_000.0),
+    "PV_LCOE": (0.0, 2_000.0),
+    "WIND_LCOE": (0.0, 2_000.0),
+    "NUKE_LCOE": (0.0, 2_000.0),
+    "LCOS": (0.0, 2_000.0),
+    "IMPORT_COST": (0.0, 2_000.0),
 }
 
 
