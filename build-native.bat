@@ -4,14 +4,28 @@ setlocal
 set "ROOT=%~dp0"
 set "ROOT=%ROOT:~0,-1%"
 set "VENV=%ROOT%\.venv"
-set "VSDEVCMD=C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
+
+rem Prefer Visual Studio 2022 Build Tools, fall back to common VS2022/VS2023 IDE locations.
+set "VSDEVCMD=C:\Program Files\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
+if not exist "%VSDEVCMD%" (
+    set "VSDEVCMD=C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
+)
+if not exist "%VSDEVCMD%" (
+    set "VSDEVCMD=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
+)
+if not exist "%VSDEVCMD%" (
+    set "VSDEVCMD=C:\Program Files (x86)\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"
+)
+if not exist "%VSDEVCMD%" (
+    set "VSDEVCMD=C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"
+)
 
 if not exist "%VENV%\Scripts\python.exe" (
     echo [ERROR] Python virtual environment not found: %VENV%
     exit /b 1
 )
 if not exist "%VSDEVCMD%" (
-    echo [ERROR] Visual Studio C++ developer environment not found: %VSDEVCMD%
+    echo [ERROR] Visual Studio C++ developer environment not found. Please install "Build Tools for Visual Studio 2022" or update VSDEVCMD path in this script.
     exit /b 1
 )
 
