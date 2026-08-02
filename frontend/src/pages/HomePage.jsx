@@ -22,23 +22,21 @@ export default function HomePage() {
         <div className="card">
           <h2>Scopo e contesto</h2>
           <p>
-            Questo strumento è pensato per simulare l'effetto di differenti combinazioni del mix di fonti
-            sul bilancio energetico italiano, a partire da dati reali, ovvero i valori di produzione, consumo e
-            scambio con l'estero dell'anno <strong>2025</strong>.
-            I dati sono quelli ufficiali, estratti dal sito web di <strong>TERNA</strong>, il gestore della rete
-            di trasmissione nazionale (<a href="https://www.terna.it" target="_blank" rel="noopener noreferrer">www.terna.it</a>).<br />
-          </p>
-          <p>
             Il dibattito pubblico pone spesso l'accento sulla necessità di incrementare
             la produzione di energia elettrica da fonti rinnovabili.
             Politici, ambientalisti ed eminenti scienziati sostengono che l'Italia potrebbe raggiungere
-            l'autosufficienza energetica e la completa eliminazione delle fonti fossili (carbone, gas, olio
-            combustibile), semplicemente aumentando la potenza installata di fotovoltaico ed eolico,
+            l'autosufficienza energetica e la completa eliminazione delle fonti fossili (carbone, gas, olio combustibile),
+            semplicemente aumentando la potenza installata di fotovoltaico ed eolico,
             e incrementando al contempo la capacità di accumulo.
           </p>
           <p>
             Questo strumento consente, in modo grossolano ma efficace, di verificare se tali affermazioni
             siano realistiche.
+            Lo fa simulando l'effetto di differenti combinazioni del mix di fonti sul bilancio energetico italiano,
+            a partire da dati reali, ovvero i valori di produzione, consumo e scambio con l'estero
+            dell'anno <strong>2025</strong>.
+            I dati sono quelli ufficiali, estratti dal sito web di <strong>TERNA</strong>, il gestore della rete
+            di trasmissione nazionale (<a href="https://www.terna.it" target="_blank" rel="noopener noreferrer">www.terna.it</a>).
           </p>
         </div>
 
@@ -47,9 +45,9 @@ export default function HomePage() {
           <h2>Come usare lo strumento</h2>
           <p>
             Premendo uno dei tre bottoni sottostanti l'applicativo consentirà di:<br />
-            - modificare a proprio piacimento i parametri fisici ed economici che influenzano tutte le simulazioni;<br />
+            - consultare e modificare a proprio piacimento i parametri fisici ed economici che influenzano tutte le simulazioni;<br />
             - simulare scenari che prevedono un differente mix di fonti energetiche;<br />
-            - esplorare lo spazio degli scenari "a emissioni zero", con e senza ricorso al nucleare, confrontandone i costi.<br />
+            - esplorare lo spazio degli scenari "a emissioni zero", con e senza ricorso al nucleare, confrontandone i costi.
           </p>
         </div>
 
@@ -83,16 +81,19 @@ export default function HomePage() {
           <section className="results-section">
             <h2>Scenario di riferimento — dati reali 2025</h2>
             <p>
-              Di seguito il grafico della distribuzione della potenza consumata, importata e generata, suddivisa per fonte.<br />
-              Il grafico è interattivo: è possibile fare pan e zoom per esplorare i dettagli della distribuzione.<br />
+              Di seguito il grafico della distribuzione della potenza consumata, importata e generata,
+              suddivisa per fonte.<br />
+              Il grafico è interattivo: è possibile spostare e ridimensionare la finestra di visualizzazione
+              mediante il mouse e i tasti sulla legenda, per meglio esplorare i dettagli della distribuzione.
             </p>
             <PowerChart
               chartData={currentScenario.chart}
               title="Bilancio energetico 2025 — Scenario di riferimento"
             />
             <p>
-              Qui sotto il prospetto tabulare, sempre suddiviso per fonte, dell'energia complessiva nel periodo di riferimento,
-              dei relativi costi annui e dei picchi di potenza.
+              Qui sotto il prospetto tabulare, sempre suddiviso per fonte, dell'energia complessivamente
+              prodotta, scambiata, consumata e inutilizzata nell'anno 2025,
+              coi relativi costi e picchi di potenza.
             </p>
             <SummaryTable
               energy={currentScenario.energy}

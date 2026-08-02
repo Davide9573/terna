@@ -76,10 +76,9 @@ export default function ConfigPage() {
           <p>
             La tabella seguente consente di consultare e modificare i parametri fisici ed economici del modello:
             i rendimenti di carica e scarica degli accumuli, i costi livellati dell'energia, il costo annuo
-            della capacità di accumulo e il costo dell'importazione,
-            dell'importazione, espressi in €/MWh.
+            della capacità di accumulo e il costo dell'importazione, espressi in €/MWh.
             Per ogni parametro è riportata la ratio della scelta dei valori di default e/o la fonte dei dati.<br />
-            Questa pagina consente all'utente di modificare i parametri a proprio piacimento, rifacendosi a fonti proprie.
+            L'utente è libero di modificare i parametri a proprio piacimento, rifacendosi a fonti proprie.
             L'alterazione di questi parametri <strong>non</strong> garantisce che le simulazioni siano realistiche.
           </p>
         </div>

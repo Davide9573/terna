@@ -2,7 +2,7 @@
 # Physical/Engineering parameters for the energy simulation
 ETA_CHARGE = 0.9  # Charge efficiency of the storage
 ETA_DISCHARGE = 0.9  # Discharge efficiency of the storage
-NUCLEAR_BASE_LOAD_FACTOR = 0.3  # Nuclear base load factor, assumed to be 30% of the peak power
+NUCLEAR_BASE_LOAD_FACTOR = 0.4  # Nuclear base load factor, assumed to be 40% of the peak power
 
 
 # Italian/European 2024 cost baseline for new capacity, expressed in real €/MWh.

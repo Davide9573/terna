@@ -65,7 +65,7 @@ export default function SimulationPage() {
               </label>
               <p className="param-hint">
                 La produzione termoelettrica residua viene rimpiazzata da nucleare con carico
-                base garantito e surplus immagazzinato negli accumuli
+                base garantito e surplus immagazzinato negli accumulatori
               </p>
             </div>
           </div>
@@ -92,7 +92,9 @@ export default function SimulationPage() {
             - l'eventuale introduzione di produzione nucleare.<br />
             La simulazione calcola la nuova distribuzione tra le varie fonti, valutando in particolare l'impatto
             sul consumo di energia termoelettrica, sull'importazione, e sui costi annui.
-            A tal fine vengono fatte alcune assunzioni, e commesse alcune approssimazioni, grossolane ma necessarie.
+            A tal fine vengono fatte alcune assunzioni, e commesse alcune approssimazioni, grossolane ma inevitabili.
+            Gran parte delle assunzioni e approssimazioni sono state fatte in modo da favorire la simulazione di scenari
+            "all renewable", e dunque tendono a sottostimare i costi e a sovrastimare la produzione da rinnovabili.
           </p>
           <p>
             <strong>Assunzioni fatte:</strong><br />
@@ -104,9 +106,11 @@ export default function SimulationPage() {
             - ove possibile, cioè in caso di produzione in eccesso, prioritariamente la potenza termoelettrica, e
             a seguire quella importata dall'estero, vengono ridotte fino ad annullarsi,
             in modo da azzerare il ricorso a fonti fossili e importazione;<br />
-            - l'energia in surplus viene immagazzinata negli accumuli, fino a capienza massima degli stessi;<br />
+            - l'energia in surplus viene immagazzinata negli accumulatori, fino a capienza massima degli stessi;<br />
+            - l'energia immagazzinata negli accumulatori a inizio simulazione (cioè al 1/1/2025) viene considerata,
+            in modo estremamente ottimistico, anche se poco realistico, pari alla capienza massima;<br />
             - laddove il surplus di potenza rinnovabile non sia sufficiente ad azzerare il ricorso a termoelettrico e
-            importazione, e qualora ci sia capacità residua negli accumuli, questa viene utilizzata per coprire il
+            importazione, e qualora ci sia capacità residua negli accumulatori, questa viene utilizzata per coprire il
             fabbisogno;<br />
             - l'energia accumulata può essere caricata e scaricata in qualsiasi momento, senza vincoli di potenza,
             ma tenendo conto dei rispettivi rendimenti, di carica e scarica;<br />
@@ -120,7 +124,7 @@ export default function SimulationPage() {
           </p>
           <p>
             <strong>Approssimazioni e aspetti trascurati:</strong><br />
-            - non viene posto alcun limite alla potenza di carica e scarica degli accumuli, ma solo alla
+            - non viene posto alcun limite alla potenza di carica e scarica degli accumulatori, ma solo alla
             capacità massima;<br />
             - non vengono considerati i costi di realizzazione e gestione dei sistemi di conversione da corrente
             continua ad alternata;<br />

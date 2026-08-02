@@ -126,8 +126,9 @@ PARAM_METADATA = {
             "minima garantita (base load), indipendentemente dalla domanda."
         ),
         "rationale": (
-            "I reattori moderni operano tipicamente tra il 70% e il 90% della capacità nominale. "
-            "Il valore del 30% è conservativo e riflette la flessibilità operativa dei nuovi impianti SMR."
+            "I reattori nucleari presentano dei limiti alla propria capacità di modulazione, cioè la possibilità di ridurre "
+            "la produzione di energia nei momenti di scarsa domanda. "
+            "Il 40% è un valore conservativo ma realistico, che riflette la flessibilità operativa dei reattori moderni."
         ),
     },
     "THERMAL_LCOE": {
