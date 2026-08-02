@@ -1,7 +1,6 @@
 @echo off
 setlocal
 
-set "NODE_DIR=D:\Dev\nodejs"
 set "VENV_DIR=%~dp0.venv"
 set "FRONTEND_DIR=%~dp0frontend"
 
@@ -9,12 +8,19 @@ echo === Simulatore Energetico TERNA 2025 ===
 echo.
 
 :: Check Node.js
-if not exist "%NODE_DIR%\node.exe" (
-    echo [ERRORE] Node.js non trovato in %NODE_DIR%
-    echo         Assicurarsi che il percorso sia corretto oppure modificare NODE_DIR in questo script.
-    pause
-    exit /b 1
+for /f "delims=" %%I in ('where.exe node 2^>nul') do (
+    set "NODE_EXE=%%~fI"
+    goto :node_found
 )
+
+echo [ERRORE] Node.js non trovato nel PATH di sistema.
+echo         Installare Node.js e assicurarsi che la sua cartella sia nel PATH.
+pause
+exit /b 1
+
+:node_found
+for %%I in ("%NODE_EXE%") do set "NODE_DIR=%%~dpI"
+set "PATH=%NODE_DIR%;%PATH%"
 
 :: Check venv
 if not exist "%VENV_DIR%\Scripts\uvicorn.exe" (
