@@ -477,7 +477,7 @@ def plot_decarbonization_surface(
     ax.set_title('Decarbonization Surface\n' \
                  'Minimum (k_pv, k_w, C) needed to decarbonize\n' \
                  'the Italian electricity generation system without nuclear power,\n' \
-                 'and related additional costs (w.r.t. the 2025 scenario)', fontsize=14)
+                 'and related costs', fontsize=14)
     plt.tight_layout()
     if show:
         plt.show()
