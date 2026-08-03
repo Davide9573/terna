@@ -3,6 +3,7 @@ setlocal
 
 set "VENV_DIR=%~dp0.venv"
 set "FRONTEND_DIR=%~dp0frontend"
+set "NATIVE_MODULE_DIR=%~dp0build\python\Release"
 
 echo === Simulatore Energetico TERNA 2025 ===
 echo.
@@ -41,6 +42,16 @@ set "PATH=%NODE_DIR%;%PATH%"
 if not exist "%VENV_DIR%\Scripts\uvicorn.exe" (
     echo [ERRORE] Virtual environment non trovato in %VENV_DIR%
     echo         Eseguire prima: python -m venv .venv ^&^& .venv\Scripts\pip install fastapi uvicorn[standard]
+    pause
+    exit /b 1
+)
+
+set "TERNA_SIMULATION_ENGINE=cpp"
+set "PYTHONPATH=%NATIVE_MODULE_DIR%;%PYTHONPATH%"
+"%VENV_DIR%\Scripts\python.exe" -c "import _terna_cpp; print('[OK] Backend C++:', _terna_cpp.__file__)"
+if errorlevel 1 (
+    echo [ERRORE] Il backend C++ non e' disponibile.
+    echo         Eseguire build-native.bat e verificare che _terna_cpp sia compilato in %NATIVE_MODULE_DIR%.
     pause
     exit /b 1
 )
