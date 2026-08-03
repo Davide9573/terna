@@ -3,7 +3,13 @@ setlocal
 
 set "VENV_DIR=%~dp0.venv"
 set "FRONTEND_DIR=%~dp0frontend"
+rem The build outputs are placed in build\python\Release when using CMake on Windows.
 set "NATIVE_MODULE_DIR=%~dp0build\python\Release"
+if not exist "%NATIVE_MODULE_DIR%" set "NATIVE_MODULE_DIR=%~dp0build\python"
+
+if exist "%NATIVE_MODULE_DIR%\_terna_cpp.cp314-win_amd64.pyd" (
+    echo [INFO] Using native module directory: %NATIVE_MODULE_DIR%
+)
 
 echo === Simulatore Energetico TERNA 2025 ===
 echo.
