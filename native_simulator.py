@@ -86,6 +86,23 @@ def decarbonization_surface(data: ElectricData, k_pv_range: float, k_w_range: fl
     ]
 
 
+def nuclear_decarbonization_surface(data: ElectricData, k_pv_range: float, k_w_range: float) -> list[tuple[float, float, float, float]]:
+    if _terna_cpp is None:
+        raise RuntimeError("The C++ simulation extension is not available.")
+    duration_days = (data.end - data.start).days
+    return [
+        (float(k_pv), float(k_w), float(nuclear_peak), float(annual_cost))
+        for k_pv, k_w, nuclear_peak, annual_cost in _terna_cpp.nuclear_decarbonization_surface(
+            _series(data),
+            k_pv_range,
+            k_w_range,
+            duration_days,
+            parameter_snapshot(),
+            max(0, int(os.getenv("TERNA_SURFACE_WORKERS", "0"))),
+        )
+    ]
+
+
 def load_csv(path: str, kind: str) -> tuple[dict[str, np.ndarray], str, str]:
     """Load one raw data CSV through the C++ parser and return Python-compatible values."""
     if _terna_cpp is None:

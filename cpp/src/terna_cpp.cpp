@@ -51,6 +51,7 @@ constexpr double kMwhPerGwh = 1'000.0;
 constexpr double kGeurPerEur = 1e-9;
 using Series = std::array<std::vector<double>, source_count>;
 
+/// @brief Structure to hold simulation parameters for energy scenarios.
 struct SimulationParameters {
     double eta_charge;
     double eta_discharge;
@@ -59,6 +60,7 @@ struct SimulationParameters {
     std::unordered_map<std::string, double> source_costs;
 };
 
+/// @brief Structure to hold the results of a simulated energy scenario.
 struct ScenarioResult {
     Series values;
     double final_capacity;
@@ -414,6 +416,16 @@ Series parse_series(const py::dict& input) {
     return result;
 }
 
+/// @brief Redistribute power among different sources for a single time step.
+/// @param output output series to store redistributed energy values
+/// @param input input series containing energy data for various sources
+/// @param index current time step index
+/// @param capacity current storage capacity
+/// @param max_capacity maximum storage capacity
+/// @param k_pv photovoltaic scaling factor
+/// @param k_w wind scaling factor
+/// @param nuke whether nuclear power is considered
+/// @param parameters simulation parameters
 void redistribute(Series& output, const Series& input, std::size_t index, double& capacity,
                   double max_capacity, double k_pv, double k_w, bool nuke,
                   const SimulationParameters& parameters) {
@@ -464,6 +476,14 @@ void redistribute(Series& output, const Series& input, std::size_t index, double
     }
 }
 
+/// @brief Simulate a single power scenario with the given parameters and input series.
+/// @param input input series containing energy data for various sources
+/// @param max_capacity maximum storage capacity
+/// @param k_pv photovoltaic scaling factor
+/// @param k_w wind scaling factor
+/// @param nuke whether nuclear power is considered
+/// @param parameters simulation parameters
+/// @return simulated power     scenario result
 ScenarioResult simulate(const Series& input, double max_capacity, double k_pv, double k_w, bool nuke,
                         const SimulationParameters& parameters) {
     if (max_capacity < 0.0 || parameters.eta_charge <= 0.0 || parameters.eta_discharge <= 0.0) {
@@ -494,6 +514,13 @@ ScenarioResult simulate(const Series& input, double max_capacity, double k_pv, d
     return result;
 }
 
+/// @brief Check if a given energy scenario is feasible with the specified parameters.
+/// @param input input series containing energy data for various sources
+/// @param max_capacity maximum storage capacity
+/// @param k_pv photovoltaic scaling factor
+/// @param k_w wind scaling factor
+/// @param parameters simulation parameters
+/// @return true if the scenario is feasible, false otherwise
 bool feasible(const Series& input, double max_capacity, double k_pv, double k_w,
               const SimulationParameters& parameters) {
     const auto result = simulate(input, max_capacity, k_pv, k_w, false, parameters);
@@ -505,6 +532,13 @@ bool feasible(const Series& input, double max_capacity, double k_pv, double k_w,
     return true;
 }
 
+/// @brief Determine the minimum storage capacity required for a feasible power scenario.
+/// @param input input series containing energy data for various sources
+/// @param capacity_range maximum storage capacity to consider
+/// @param k_pv photovoltaic scaling factor
+/// @param k_w wind scaling factor
+/// @param parameters simulation parameters
+/// @return minimum required storage capacity, or -1.0 if no feasible capacity exists within the range
 double minimum_capacity(const Series& input, double capacity_range, double k_pv, double k_w,
                         const SimulationParameters& parameters) {
     if (!feasible(input, capacity_range, k_pv, k_w, parameters)) {
@@ -537,6 +571,14 @@ py::dict series_to_python(const Series& series) {
     return result;
 }
 
+/// @brief Run a single energy scenario simulation with the specified parameters and input series.
+/// @param series input series containing energy data for various sources
+/// @param max_capacity maximum storage capacity
+/// @param k_pv photovoltaic scaling factor
+/// @param k_w wind scaling factor
+/// @param nuke whether nuclear power is considered
+/// @param parameter_values simulation parameters as a Python dictionary
+/// @return simulated scenario result as a Python dictionary
 py::dict run_scenario(const py::dict& series, double max_capacity, double k_pv, double k_w,
                       bool nuke, const py::dict& parameter_values) {
     const auto parameters = parse_parameters(parameter_values);
@@ -546,6 +588,14 @@ py::dict run_scenario(const py::dict& series, double max_capacity, double k_pv, 
     return output;
 }
 
+/// @brief Calculate (some sampling points of) the decarbonization surface in the given range for the scenario parameters.
+/// @param series input series containing energy data for various sources
+/// @param k_pv_range range of photovoltaic scaling factors to consider
+/// @param k_w_range range of wind scaling factors to consider
+/// @param capacity_range maximum storage capacity to consider
+/// @param parameter_values simulation parameters as a Python dictionary
+/// @param workers number of worker threads to use (0 for automatic detection)
+/// @return list of tuples containing (k_pv, k_w, minimum required storage capacity)
 py::list run_surface(const py::dict& series, double k_pv_range, double k_w_range,
                      double capacity_range, const py::dict& parameter_values, unsigned int workers) {
     const auto input = parse_series(series);
@@ -596,6 +646,86 @@ py::list run_surface(const py::dict& series, double k_pv_range, double k_w_range
     return results;
 }
 
+/// @brief Calculate the nuclear decarbonization surface without storage for the given scenario parameters.
+/// @param series input power series containing energy data for various sources
+/// @param k_pv_range range of photovoltaic scaling factors to consider
+/// @param k_w_range range of wind scaling factors to consider
+/// @param duration_days duration of the scenario in days
+/// @param parameter_values simulation parameters as a Python dictionary
+/// @param workers number of worker threads to use (0 for automatic detection)
+/// @return list of tuples containing (k_pv, k_w, nuclear_peak, annual_total_cost)
+py::list run_nuclear_surface(const py::dict& series, double k_pv_range, double k_w_range,
+                             double duration_days, const py::dict& parameter_values, unsigned int workers) {
+    const auto input = parse_series(series);
+    const auto parameters = parse_parameters(parameter_values);
+    if (duration_days < 0.0) {
+        throw std::invalid_argument("duration_days cannot be negative.");
+    }
+    const double pv_step = k_pv_range / 10.0;
+    const double wind_step = k_w_range / 10.0;
+    const double annualization = duration_days > 0.0 ? 365.0 / duration_days : 0.0;
+    std::vector<double> pv_values;
+    for (double k_pv = k_pv_range; k_pv >= 1.0; k_pv -= pv_step) {
+        pv_values.push_back(k_pv);
+    }
+    using SurfacePoint = std::array<double, 4>;
+    std::vector<std::vector<SurfacePoint>> rows(pv_values.size());
+    std::atomic<std::size_t> next_row{0};
+    const unsigned int detected_workers = std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int requested_workers = workers == 0 ? detected_workers : workers;
+    const unsigned int worker_count = std::min<unsigned int>(requested_workers, static_cast<unsigned int>(pv_values.size()));
+    const auto compute_row = [&]() {
+        while (true) {
+            const std::size_t row_index = next_row.fetch_add(1);
+            if (row_index >= pv_values.size()) {
+                return;
+            }
+            const double k_pv = pv_values[row_index];
+            auto& row = rows[row_index];
+            for (double k_w = k_w_range; k_w >= 1.0; k_w -= wind_step) {
+                const auto scenario = simulate(input, 0.0, k_pv, k_w, true, parameters);
+                const double nuclear_peak = *std::max_element(
+                    scenario.values[Nuclear].begin(), scenario.values[Nuclear].end());
+                double total_cost = 0.0;
+                for (std::size_t source = 0; source < 9; ++source) {
+                    const std::string key(kSources[source]);
+                    const auto cost_it = parameters.source_costs.find(key);
+                    const double unit_cost = cost_it == parameters.source_costs.end() ? 0.0 : cost_it->second;
+                    double energy = 0.0;
+                    for (const double value : scenario.values[source]) {
+                        if (!std::isnan(value)) {
+                            energy += value;
+                        }
+                    }
+                    total_cost += energy / 4.0 * kMwhPerGwh * unit_cost * annualization * kGeurPerEur;
+                }
+                row.push_back({k_pv, k_w, nuclear_peak, total_cost});
+            }
+        }
+    };
+    std::vector<std::thread> pool;
+    pool.reserve(worker_count);
+    for (unsigned int index = 0; index < worker_count; ++index) {
+        pool.emplace_back(compute_row);
+    }
+    for (auto& worker : pool) {
+        worker.join();
+    }
+    py::list results;
+    for (const auto& row : rows) {
+        for (const auto& point : row) {
+            results.append(py::make_tuple(point[0], point[1], point[2], point[3]));
+        }
+    }
+    return results;
+}
+
+/// @brief Calculate the energy costs for a given scenario.
+/// @param series input series containing energy data for various sources
+/// @param storage_capacity storage capacity of the system
+/// @param duration_days duration of the scenario in days
+/// @param parameter_values simulation parameters as a Python dictionary
+/// @return dictionary containing energy and cost for each source, and the total cost
 py::dict run_costs(const py::dict& series, double storage_capacity, double duration_days,
                    const py::dict& parameter_values) {
     const auto input = parse_series(series);
@@ -636,6 +766,8 @@ PYBIND11_MODULE(_terna_cpp, module) {
                py::arg("k_pv"), py::arg("k_w"), py::arg("nuke"), py::arg("parameters"));
     module.def("decarbonization_surface", &run_surface, py::arg("series"), py::arg("k_pv_range"),
                py::arg("k_w_range"), py::arg("capacity_range"), py::arg("parameters"), py::arg("workers") = 0);
+    module.def("nuclear_decarbonization_surface", &run_nuclear_surface, py::arg("series"), py::arg("k_pv_range"),
+               py::arg("k_w_range"), py::arg("duration_days"), py::arg("parameters"), py::arg("workers") = 0);
     module.def("energy_costs", &run_costs, py::arg("series"), py::arg("storage_capacity"),
                py::arg("duration_days"), py::arg("parameters"));
     module.def("load_csv", &load_csv, py::arg("path"), py::arg("kind"));

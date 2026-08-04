@@ -361,6 +361,29 @@ def compute_decarbonization_surface(
         k_pv -= k_pv_step
     return results
 
+def compute_nuclear_decarbonization_surface(
+        power_in: ElectricData,
+        k_pv_range: float,
+        k_w_range: float) -> list[tuple[float, float, float, float]]:
+    """Compute nuclear peak power and annual cost while replacing thermal generation with nuclear."""
+    if native_simulator.use_cpp_engine():
+        return native_simulator.nuclear_decarbonization_surface(power_in, k_pv_range, k_w_range)
+
+    results: list[tuple[float, float, float, float]] = []
+    k_pv_step = k_pv_range / 10.0
+    k_w_step = k_w_range / 10.0
+    k_pv = k_pv_range
+    while k_pv >= 1.0:
+        k_w = k_w_range
+        while k_w >= 1.0:
+            scenario = simulate_alternative_scenario(power_in, 0.0, k_pv, k_w, nuke=True)
+            nuclear_peak = scenario.power_peak["Nuclear"][0]
+            annual_cost = compute_costs(scenario)["Total"]
+            results.append((k_pv, k_w, nuclear_peak, annual_cost))
+            k_w -= k_w_step
+        k_pv -= k_pv_step
+    return results
+
 def compute_decarbonization_costs(
         ref_data: ElectricData,
         decarbonization_surface: list[tuple[float, float, float]]) -> list[tuple[float, float, float, float]]:

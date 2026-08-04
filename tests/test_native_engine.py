@@ -105,6 +105,31 @@ class NativeEngineParityTests(unittest.TestCase):
         self.assertEqual(len(actual), len(expected))
         np.testing.assert_allclose(actual, expected)
 
+    def test_nuclear_decarbonization_surface_matches_python_reference(self):
+        data = make_data()
+        data.end = pd.Timestamp("2025-01-02T00:00:00")
+        original_engine = os.environ.get("TERNA_SIMULATION_ENGINE")
+        original_workers = os.environ.get("TERNA_SURFACE_WORKERS")
+        try:
+            os.environ["TERNA_SIMULATION_ENGINE"] = "python"
+            expected = simulator.compute_nuclear_decarbonization_surface(data, 2.0, 1.0)
+            os.environ["TERNA_SIMULATION_ENGINE"] = "cpp"
+            os.environ["TERNA_SURFACE_WORKERS"] = "2"
+            actual = simulator.compute_nuclear_decarbonization_surface(data, 2.0, 1.0)
+        finally:
+            if original_engine is None:
+                os.environ.pop("TERNA_SIMULATION_ENGINE", None)
+            else:
+                os.environ["TERNA_SIMULATION_ENGINE"] = original_engine
+            if original_workers is None:
+                os.environ.pop("TERNA_SURFACE_WORKERS", None)
+            else:
+                os.environ["TERNA_SURFACE_WORKERS"] = original_workers
+
+        self.assertEqual(len(actual), len(expected))
+        np.testing.assert_allclose(actual, expected)
+        self.assertTrue(all(nuclear_peak > 0.0 for _, _, nuclear_peak, _ in actual))
+
 
 class CostUnitTests(unittest.TestCase):
     def test_costs_use_euro_per_mwh_and_return_geur_per_year(self):
