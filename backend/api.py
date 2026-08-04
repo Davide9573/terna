@@ -492,6 +492,29 @@ def get_decarbonization_surface(req: DecarbonizationCostRequest):
     }
 
 
+@app.post("/api/nuclear-decarbonization-surface")
+def get_nuclear_decarbonization_surface(req: DecarbonizationCostRequest):
+    """Calculate the nuclear peak and annual cost for each renewable-capacity point."""
+    _apply_config()
+    power_data = _get_power_data_copy()
+    points = sim_module.compute_nuclear_decarbonization_surface(
+        power_data,
+        req.k_pv_range,
+        req.k_w_range,
+    )
+    return {
+        "points": [
+            {
+                "k_pv": k_pv,
+                "k_w": k_w,
+                "nuclear_peak": nuclear_peak,
+                "cost": cost,
+            }
+            for k_pv, k_w, nuclear_peak, cost in points
+        ]
+    }
+
+
 # ── Static frontend (production) ──────────────────────────────────────────────
 # When the React app has been built (frontend/dist exists), serve it from the
 # same origin as the API so no CORS or proxy configuration is needed.

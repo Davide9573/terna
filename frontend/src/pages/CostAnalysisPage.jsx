@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DecarbonizationSurface from '../components/DecarbonizationSurface'
-import PowerChart from '../components/PowerChart'
-import SummaryTable from '../components/SummaryTable'
 
 export default function CostAnalysisPage() {
   const navigate = useNavigate()
   const [surface, setSurface] = useState(null)
+  const [nuclearSurface, setNuclearSurface] = useState(null)
   const hasLoadedInitialCosts = useRef(false)
-  const [nuclearScenario, setNuclearScenario] = useState(null)
-  const hasLoadedNuclearScenario = useRef(false)
   const [ranges, setRanges] = useState({
     k_pv_range: 20,
     k_w_range: 20,
@@ -21,12 +18,15 @@ export default function CostAnalysisPage() {
   const calculateCosts = () => {
     setLoading(true)
     setError(null)
-    fetch('/api/decarbonization-surface', {
+    const requestBody = {
+      k_pv_range: Number(ranges.k_pv_range),
+      k_w_range: Number(ranges.k_w_range),
+    }
+    const storageSurfaceRequest = fetch('/api/decarbonization-surface', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        k_pv_range: Number(ranges.k_pv_range),
-        k_w_range: Number(ranges.k_w_range),
+        ...requestBody,
         storage_capacity_range_twh: Number(ranges.storage_capacity_range_twh),
       }),
     })
@@ -34,7 +34,22 @@ export default function CostAnalysisPage() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         return response.json()
       })
-      .then(data => { setSurface(data.points); setLoading(false) })
+    const nuclearSurfaceRequest = fetch('/api/nuclear-decarbonization-surface', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json()
+      })
+
+    Promise.all([storageSurfaceRequest, nuclearSurfaceRequest])
+      .then(([storageSurface, nuclearSurface]) => {
+        setSurface(storageSurface.points)
+        setNuclearSurface(nuclearSurface.points)
+        setLoading(false)
+      })
       .catch(fetchError => { setError(fetchError.message); setLoading(false) })
   }
 
@@ -47,27 +62,6 @@ export default function CostAnalysisPage() {
   const handleRangeChange = (key, value) => {
     setRanges(currentRanges => ({ ...currentRanges, [key]: value }))
   }
-
-  useEffect(() => {
-    if (hasLoadedNuclearScenario.current) return
-    hasLoadedNuclearScenario.current = true
-    fetch('/api/simulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        max_capacity: 0,
-        k_pv: 1,
-        k_w: 1,
-        nuke: true,
-      }),
-    })
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        return response.json()
-      })
-      .then(data => setNuclearScenario(data.after))
-      .catch(fetchError => setError(fetchError.message))
-  }, [])
 
   return (
     <div className="page">
@@ -103,8 +97,7 @@ export default function CostAnalysisPage() {
             gli scenari a emissioni zero, ovvero quelli in cui è possibile annullare il ricorso alle fonti fossili
             senza ricorrere al nucleare.
             Il colore della superficie indica il costo livellato complessivo dello scenario, in miliardi di euro l'anno
-            (si veda la legenda accanto), da confrontare con il costo dello scenario "a emissioni zero" ottenuto mediante
-            nucleare, la cui simulazione è riportata in fondo alla pagina. <br />
+            (si veda la legenda accanto), da confrontare con le soluzioni che sostituiscono le fonti termiche con il nucleare. <br />
           </p>
         </section>
 
@@ -169,14 +162,14 @@ export default function CostAnalysisPage() {
         </section>
 
         <section className="results-section">
-          <h2>Superficie di decarbonizzazione</h2>
+          <h2>Superficie di decarbonizzazione senza ricorso al nucleare</h2>
           <p>
             Il grafico seguente fornisce una rappresentazione della superficie di decarbonizzazione
             nello spazio dei parametri k_pv, k_w e capacità di accumulo, ovvero la superficie
             che delimita gli scenari a emissioni zero, in cui è possibile annullare il ricorso alle fonti fossili
             senza ricorrere al nucleare.
             Il colore della superficie indica il costo livellato complessivo dello scenario, da confrontare con
-            la legenda accanto, in miliardi di euro all'anno.
+            la legenda accanto, in miliardi di euro l'anno.
           </p>
           {loading && (
             <div className="loading-box surface-loading">
@@ -198,24 +191,39 @@ export default function CostAnalysisPage() {
         </section>
 
         <section className="results-section">
-          <h2>Scenario di decarbonizzazione mediante ricorso al nucleare</h2>
-          {!nuclearScenario && !error && (
-            <div className="loading-box">
+          <h2>Superficie di decarbonizzazione con ricorso al nucleare</h2>
+          <p>
+            Il grafico esplora le stesse combinazioni di potenza fotovoltaica ed eolica,
+            sostituendo la produzione termica residua con il nucleare.
+            L'asse verticale indica la potenza nucleare massima richiesta, in GW;
+            il colore rappresenta il costo livellato complessivo dello scenario,
+            in miliardi di euro l'anno.
+          </p>
+          {loading && (
+            <div className="loading-box surface-loading">
               <div className="spinner" />
-              <p>Simulazione dello scenario nucleare in corso...</p>
+              <p>Calcolo della superficie con opzione nucleare in corso...</p>
             </div>
           )}
-          {nuclearScenario && (
-            <>
-              <PowerChart
-                chartData={nuclearScenario.chart}
-                title="Bilancio energetico 2025 - Scenario con nucleare"
-              />
-              <SummaryTable
-                energy={nuclearScenario.energy}
-                peaks={nuclearScenario.chart.peaks}
-              />
-            </>
+          {error && (
+            <div className="error-box">
+              <strong>Errore durante il calcolo della superficie nucleare:</strong> {error}
+            </div>
+          )}
+          {nuclearSurface && nuclearSurface.length > 0 && (
+            <DecarbonizationSurface
+              points={nuclearSurface}
+              verticalField="nuclear_peak"
+              verticalScale={1}
+              verticalAxisLabel="potenza nucleare richiesta (GW)"
+              verticalHoverLabel="Potenza nucleare"
+              verticalHoverUnit="GW"
+            />
+          )}
+          {nuclearSurface && nuclearSurface.length === 0 && (
+            <p className="results-description-placeholder">
+              Non sono stati trovati scenari con opzione nucleare nell'intervallo analizzato.
+            </p>
           )}
         </section>
       </main>

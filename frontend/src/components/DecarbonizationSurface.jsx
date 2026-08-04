@@ -1,11 +1,18 @@
 import { useMemo } from 'react'
 import Plot from 'react-plotly.js'
 
-export default function DecarbonizationSurface({ points }) {
+export default function DecarbonizationSurface({
+  points,
+  verticalField = 'storage_capacity',
+  verticalScale = 1000,
+  verticalAxisLabel = 'capacità di accumulo (TWh)',
+  verticalHoverLabel = 'Accumulo',
+  verticalHoverUnit = 'TWh',
+}) {
   const traces = useMemo(() => {
     const x = points.map(point => point.k_pv)
     const y = points.map(point => point.k_w)
-    const z = points.map(point => point.storage_capacity / 1000)
+    const z = points.map(point => point[verticalField] / verticalScale)
     const cost = points.map(point => point.cost)
 
     return [{
@@ -21,16 +28,16 @@ export default function DecarbonizationSurface({ points }) {
       hovertemplate:
         'k_pv: %{x:.2f}x<br>' +
         'k_w: %{y:.2f}x<br>' +
-        'Accumulo: %{z:.2f} TWh<br>' +
+          `${verticalHoverLabel}: %{z:.2f} ${verticalHoverUnit}<br>` +
         'Costo: %{intensity:.2f} G€/anno<extra></extra>',
     }]
-  }, [points])
+        }, [points, verticalField, verticalScale, verticalHoverLabel, verticalHoverUnit])
 
   const layout = {
     scene: {
       xaxis: { title: { text: 'moltiplicatore potenza PV' } },
       yaxis: { title: { text: 'moltiplicatore potenza eolica' } },
-      zaxis: { title: { text: 'capacità di accumulo (TWh)' } },
+      zaxis: { title: { text: verticalAxisLabel } },
       camera: { eye: { x: 1.5, y: 1.5, z: 1.05 } },
     },
     margin: { l: 0, r: 0, t: 20, b: 0 },
