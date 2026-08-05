@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Plot from 'react-plotly.js'
 import DecarbonizationSurface from '../components/DecarbonizationSurface'
 
 export default function CostAnalysisPage() {
@@ -12,6 +13,7 @@ export default function CostAnalysisPage() {
     k_w_range: 20,
     storage_capacity_range_twh: 20,
   })
+  const [costs, setCosts] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -43,11 +45,24 @@ export default function CostAnalysisPage() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         return response.json()
       })
+    const costComparisonRequest = fetch('/api/conclusions-cost-comparison', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...requestBody,
+        storage_capacity_range_twh: Number(ranges.storage_capacity_range_twh),
+      }),
+    })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json()
+      })
 
-    Promise.all([storageSurfaceRequest, nuclearSurfaceRequest])
-      .then(([storageSurface, nuclearSurface]) => {
+    Promise.all([storageSurfaceRequest, nuclearSurfaceRequest, costComparisonRequest])
+      .then(([storageSurface, nuclearSurface, costComparison]) => {
         setSurface(storageSurface.points)
         setNuclearSurface(nuclearSurface.points)
+        setCosts(costComparison)
         setLoading(false)
       })
       .catch(fetchError => { setError(fetchError.message); setLoading(false) })
@@ -81,10 +96,12 @@ export default function CostAnalysisPage() {
           <h2>Obiettivo dell'analisi</h2>
           <p>
             Lo scopo di questa sezione è analizzare quali sono i possibili scenari in grado
-            di decarbonizzare la produzione elettrica italiana, con e senza ricorso all'energia nucleare,
+            di decarbonizzare la produzione elettrica italiana, <b>con e senza ricorso al nucleare</b>,
             e confrontarne i costi. <br />
+
             I possibili scenari "a emissioni zero" sono tanti, come tanti sono i possibili mix di fonti
-            energetiche e di capacità di accumulo che si possono perseguire. <br />
+            energetiche e di capacità di accumulo che si possono perseguire.
+            
             Il calcolo qui effettuato esegue una serie di simulazioni di scenario (analoghe a quelle che si
             possono eseguire nella sezione precedente) esplorando, in un intervallo definito dall'utente,
             le combinazioni dei due parametri principali che definiscono la quantità di fonti rinnovabili
@@ -152,17 +169,11 @@ export default function CostAnalysisPage() {
           </div>
           <p>
             Modificare l'intervallo dei parametri da esplorare, e ricalcolare la superficie e i costi. <br />
-            Attenzione: il ricalcolo può impiegare alcuni minuti, a seconda dell'intervallo dei parametri selezionato.
+            Attenzione: il ricalcolo può impiegare diversi secondi, a seconda dell'intervallo dei parametri selezionato.
           </p>
           <div className="actions-row">
             <button className="btn btn-primary" onClick={calculateCosts} disabled={loading}>
               {loading ? 'Calcolo in corso...' : 'Ricalcola superficie e costi'}
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => navigate('/conclusions', { state: { ranges } })}
-            >
-              Vai alle conclusioni
             </button>
           </div>
         </section>
@@ -295,7 +306,132 @@ export default function CostAnalysisPage() {
             richiesta sia più sensibile alla variazione della potenza eolica che a quella fotovoltaica.
           </p>
         </section>
+
+        <section className="results-section">
+          <h2>Confronto dei costi livellati</h2>
+          {loading && (
+            <div className="loading-box">
+              <div className="spinner" />
+              <p>Calcolo del confronto dei costi in corso...</p>
+            </div>
+          )}
+          {error && (
+            <div className="error-box">
+              <strong>Errore durante il calcolo del confronto:</strong> {error}
+            </div>
+          )}
+          {costs && <LevelizedCostTable costs={costs} />}
+        </section>
+
+        <section className="results-section conclusions-section">
+          <div className="conclusions-text">
+            <h2>Conclusioni</h2>
+            <p>
+              Le simulazioni eseguite presentano una serie di approssimazioni grossolane,
+              ma consentono di trarre alcune conclusioni di carattere generale, che possono essere utili
+              per orientare le scelte di politica energetica in ottica di decarbonizzazione, cioè
+              di rinuncia totale ai combustibili fossili.
+            </p>
+            <p>
+              La prima considerazione è che decarbonizzare la produzione elettrica italiana con sole
+              fonti rinnovabili richiederebbe: <br />
+              - ingenti quantità di energia elettrica prodotta, che verrebbe in gran parte sprecata, <br />
+              - ingente capacità di accumulo, attualmente non disponibile. <br />
+              La presente analisi non tiene conto: <br />
+              - né della realizzabilità tecnica di una simile capacità di accumulo
+              (parliamo di una capacità di 1-2 ordini di grandezza superiore a quella teoricamente
+              disponibile tramite pompaggio idroelettrico) <br />
+              - né della complessità tecnico-economica di un sistema di trasformazione di simili quantità
+              di energia da corrente continua a corrente alternata (e dissipazione dell'energia inutilizzata) <br />
+              - né della fattibilità tecnica del bilanciamento della rete elettrica in
+              assenza di rotori elettromeccanici di grande inerzia, come quelli presenti in centrali
+              termoelettriche <br />
+              - né della complessità tecnico-economica di un sistema di trasmissione e distribuzione in grado di
+              gestire simili flussi energetici dalle zone di produzione a quelle di consumo. <br />
+              Quindi la <b>fattibilità tecnica di una decarbonizzazione con sole rinnovabili</b> rimane
+              questione <b>incerta e dibattuta</b>, ben al di là degli scopi (e delle possibilità) di questa analisi.
+            </p>
+            <p>
+              La seconda considerazione riguarda invece il <b>confronto tra i costi</b> della decarbonizzazione
+              con e senza ricorso al nucleare, anche nell'ipotesi di fattibilità tecnica di entrambe
+              le soluzioni.
+              
+              È infatti su questo che si è focalizzato il dibattito negli ultimi mesi, ed è su questo che
+              la presente analisi si concentra. <br />
+              
+              Il confronto dei costi complessivi (costi che l'utente può ricalcolare utilizzando
+              parametri tecnico-economici personalizzati, differenti da quelli qui impostati come default)
+              mostra che:<br />
+              - sebbene il nucleare richieda investimenti iniziali significativi, che verrebbero ammortizzati in tempi molto lunghi, <br />
+              - nonostante i costi livellati annui delle rinnovabili siano decisamente più bassi di quelli
+              del nucleare, <br />
+              la sua introduzione consentirebbe di ridurre significativamente i costi complessivi della
+              decarbonizzazione.
+              
+              O meglio ancora:<br />
+              l'introduzione
+              del <b>nucleare appare l'unico modo per contenere i costi della decarbonizzazione</b> entro
+              limiti ragionevoli, senza dover ricorrere a quantità di energia prodotta e accumulata enormi,
+              e quindi a sprechi energetici e costi di gestione della rete elettrica altrettanto enormi.
+            </p>
+          </div>
+        </section>
       </main>
+    </div>
+  )
+}
+
+function LevelizedCostTable({ costs }) {
+  const sources = Object.keys(costs.reference)
+  const scenarios = [
+    { label: 'Attuale (2025)', value: costs.reference.Total, color: '#B22222' },
+    { label: 'Solo rinnovabili', value: costs.without_nuclear.Total, color: '#4CAF50' },
+    { label: 'Mix nucleare-rinnovabili', value: costs.with_nuclear.Total, color: '#0055FF' },
+  ]
+
+  return (
+    <div className="summary-table-wrapper">
+      <table className="summary-table">
+        <thead>
+          <tr>
+            <th>Fonte / Voce</th>
+            <th>Scenario di riferimento (2025)</th>
+            <th>Scenario più economico senza nucleare</th>
+            <th>Scenario più economico con nucleare</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sources.map(source => (
+            <tr key={source} className={source === 'Total' ? 'total-row' : ''}>
+              <td>{source === 'Total' ? <strong>Totale</strong> : source}</td>
+              <td>{costs.reference[source].toFixed(3)}</td>
+              <td>{costs.without_nuclear[source].toFixed(3)}</td>
+              <td>{costs.with_nuclear[source].toFixed(3)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="table-note">Costi livellati annui in G€/anno.</p>
+      <Plot
+        data={[{
+          type: 'bar',
+          x: scenarios.map(scenario => scenario.label),
+          y: scenarios.map(scenario => scenario.value),
+          marker: { color: scenarios.map(scenario => scenario.color) },
+          hovertemplate: '%{x}<br><b>%{y:.3f} G€/anno</b><extra></extra>',
+        }]}
+        layout={{
+          title: { text: 'Confronto del costo livellato totale', font: { size: 14, color: '#0d1b2a' } },
+          yaxis: { title: 'Costo livellato (G€/anno)', rangemode: 'tozero' },
+          margin: { l: 70, r: 20, t: 55, b: 90 },
+          paper_bgcolor: '#ffffff',
+          plot_bgcolor: '#fafbfc',
+          showlegend: false,
+        }}
+        useResizeHandler
+        style={{ width: '100%', height: '380px' }}
+        config={{ responsive: true, displaylogo: false }}
+      />
     </div>
   )
 }
