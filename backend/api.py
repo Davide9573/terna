@@ -515,6 +515,56 @@ def get_nuclear_decarbonization_surface(req: DecarbonizationCostRequest):
     }
 
 
+@app.post("/api/conclusions-cost-comparison")
+def get_conclusions_cost_comparison(req: DecarbonizationCostRequest):
+    """Return annual costs by source for the reference and cheapest decarbonized scenarios."""
+    _apply_config()
+    capacity_range = req.storage_capacity_range_twh * 1_000
+    signature = _surface_signature(req.k_pv_range, req.k_w_range, capacity_range)
+
+    global _decarbonization_surface, _decarbonization_surface_signature
+    with _decarbonization_surface_lock:
+        if signature != _decarbonization_surface_signature:
+            _decarbonization_surface = sim_module.compute_decarbonization_surface(
+                _get_power_data_copy(),
+                req.k_pv_range,
+                req.k_w_range,
+                capacity_range,
+            )
+            _decarbonization_surface_signature = signature
+        storage_surface = list(_decarbonization_surface)
+
+    if not storage_surface:
+        raise HTTPException(
+            status_code=422,
+            detail="Nessuno scenario senza nucleare nell'intervallo selezionato.",
+        )
+
+    storage_costs = sim_module.compute_decarbonization_costs(
+        _get_power_data_copy(), storage_surface
+    )
+    best_storage = min(storage_costs, key=lambda point: point[3])
+    nuclear_surface = sim_module.compute_nuclear_decarbonization_surface(
+        _get_power_data_copy(), req.k_pv_range, req.k_w_range
+    )
+    best_nuclear = min(nuclear_surface, key=lambda point: point[3])
+
+    reference = _get_power_data_copy()
+    reference.compute_energy()
+    without_nuclear = sim_module.simulate_alternative_scenario(
+        _get_power_data_copy(), best_storage[2], best_storage[0], best_storage[1], nuke=False
+    )
+    with_nuclear = sim_module.simulate_alternative_scenario(
+        _get_power_data_copy(), 0.0, best_nuclear[0], best_nuclear[1], nuke=True
+    )
+
+    return {
+        "reference": sim_module.compute_costs(reference),
+        "without_nuclear": sim_module.compute_costs(without_nuclear),
+        "with_nuclear": sim_module.compute_costs(with_nuclear),
+    }
+
+
 # ── Static frontend (production) ──────────────────────────────────────────────
 # When the React app has been built (frontend/dist exists), serve it from the
 # same origin as the API so no CORS or proxy configuration is needed.

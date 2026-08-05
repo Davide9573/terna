@@ -260,6 +260,13 @@ body {
 .sep-row td    { height: 3px; background: #e8ecf2; padding: 0; border: none; }
 .cost-pos { color: var(--danger); font-weight: 600; }
 .cost-neg { color: var(--success); font-weight: 600; }
+.conclusions-section { padding: 1.5rem; }
+.conclusions-text p {
+  margin-bottom: 1.25rem;
+  line-height: 1.75;
+}
+.conclusions-text p:last-child { margin-bottom: 0; }
+.table-note { font-size: 0.78rem; color: #888; margin-top: 0.6rem; }
 
 /* ── Loading / Error ───────────────────────────────────────── */
 .loading-box {
