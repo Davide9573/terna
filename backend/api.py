@@ -556,6 +556,16 @@ def get_conclusions_cost_comparison(req: DecarbonizationCostRequest):
         "reference": sim_module.compute_costs(reference),
         "without_nuclear": sim_module.compute_costs(without_nuclear),
         "with_nuclear": sim_module.compute_costs(with_nuclear),
+        "without_nuclear_parameters": {
+            "k_pv": best_storage[0],
+            "k_w": best_storage[1],
+            "storage_capacity": best_storage[2],
+        },
+        "with_nuclear_parameters": {
+            "nuclear_power": best_nuclear[2],
+            "k_pv": best_nuclear[0],
+            "k_w": best_nuclear[1],
+        },
     }
 
 

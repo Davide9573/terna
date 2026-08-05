@@ -355,6 +355,18 @@ export default function CostAnalysisPage() {
             </p>
           </div>
         </section>
+
+        <div className="actions-row">
+          <button className="btn btn-secondary" onClick={() => navigate('/config')}>
+            ⚙️ Configura i parametri fisici<br /> ed economici del modello
+          </button>
+          <button className="btn btn-primary" onClick={() => navigate('/simulation')}>
+            ▶️ Esegui la simulazione di un<br /> singolo scenario alternativo
+          </button>
+          <button className="btn btn-secondary" onClick={() => navigate('/')}>
+            ← Torna alla pagina iniziale
+          </button>
+        </div>
       </main>
     </div>
   )
@@ -362,6 +374,8 @@ export default function CostAnalysisPage() {
 
 function LevelizedCostTable({ costs }) {
   const sources = Object.keys(costs.reference)
+  const withoutNuclearParameters = costs.without_nuclear_parameters
+  const withNuclearParameters = costs.with_nuclear_parameters
   const scenarios = [
     { label: 'Attuale (2025)', value: costs.reference.Total, color: '#606060' },
     { label: 'Solo rinnovabili', value: costs.without_nuclear.Total, color: '#4CAF50' },
@@ -375,8 +389,16 @@ function LevelizedCostTable({ costs }) {
           <tr>
             <th>Fonte / Voce</th>
             <th>Scenario di riferimento (2025)</th>
-            <th>Scenario più economico senza nucleare</th>
-            <th>Scenario più economico con nucleare</th>
+            <th>
+              Scenario più economico senza nucleare<br />
+              (k_pv = {withoutNuclearParameters.k_pv.toFixed(2)}, k_w = {withoutNuclearParameters.k_w.toFixed(2)},
+              C = {withoutNuclearParameters.storage_capacity.toFixed(2)} GWh)
+            </th>
+            <th>
+              Scenario più economico con nucleare<br />
+              (P_nuke = {withNuclearParameters.nuclear_power.toFixed(2)} GW, k_pv = {withNuclearParameters.k_pv.toFixed(2)},
+              k_w = {withNuclearParameters.k_w.toFixed(2)})
+            </th>
           </tr>
         </thead>
         <tbody>
