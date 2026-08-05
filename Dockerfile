@@ -42,4 +42,4 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 RUN python convert_csv_into_pnz.py
 
 EXPOSE 8080
-CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8080}"]

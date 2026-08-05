@@ -2,10 +2,9 @@
 # Docs: https://render.com/docs/blueprint-spec
 #
 # What happens on each deploy:
-#   1. Python deps are installed.
-#   2. The React frontend is built to frontend/dist/.
-#   3. power_2025.npz is regenerated from the CSV files in the repository.
-#   4. FastAPI (uvicorn) starts and serves both the API and the built frontend.
+#   1. Docker builds the React frontend and the C++ simulation extension.
+#   2. The runtime image regenerates power_2025.npz from the CSV files.
+#   3. FastAPI (uvicorn) starts and serves both the API and the built frontend.
 #
 # Free tier note: the service spins down after ~15 min of inactivity and takes
 # ~30 s to cold-start on the next request — fine for a demo/educational app.
@@ -13,13 +12,8 @@
 services:
   - type: web
     name: terna
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: >
-      pip install -r requirements.txt &&
-      cd frontend && npm ci && npm run build && cd .. &&
-      python convert_csv_into_pnz.py
-    startCommand: uvicorn backend.api:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field, field_validator
 
 import parameters as params_module
 import simulator as sim_module
+import native_simulator
 import utility
 from utility import ElectricData, load_power_data_from_npz
 
@@ -54,6 +55,14 @@ _decarbonization_surface_lock = Lock()
 async def _load_power_data():
     """Load power data and initialize an empty decarbonization-surface cache."""
     global _power_data_2025, _decarbonization_surface, _decarbonization_surface_signature
+    configured_engine = os.getenv("TERNA_SIMULATION_ENGINE", "python")
+    selected_engine = "C++" if native_simulator.use_cpp_engine() else "Python"
+    print(
+        "[INFO] Simulation engine: "
+        f"{selected_engine} "
+        f"(configured: {configured_engine}, C++ extension available: "
+        f"{native_simulator.cpp_available()})"
+    )
     _power_data_2025 = load_power_data_from_npz(NPZ_PATH)
     _power_data_2025.compute_energy()
     _decarbonization_surface = []
