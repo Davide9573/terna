@@ -58,7 +58,7 @@ async def _load_power_data():
     configured_engine = os.getenv("TERNA_SIMULATION_ENGINE", "python")
     selected_engine = "C++" if native_simulator.use_cpp_engine() else "Python"
     print(
-        "[INFO] Simulation engine: "
+        "INFO: Simulation engine: "
         f"{selected_engine} "
         f"(configured: {configured_engine}, C++ extension available: "
         f"{native_simulator.cpp_available()})"
