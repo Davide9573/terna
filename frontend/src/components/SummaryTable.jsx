@@ -6,7 +6,16 @@ const OTHER = ['Import', 'Export', 'Consumption']
 
 export default function SummaryTable({ energy, peaks }) {
   const energyValue = (source) => energy[source]?.energy ?? 0
-  const costValue = (source) => energy[source]?.cost ?? 0
+  const productionEnergy = energyValue('Total Production')
+  const productionCost = energy['Total Production']?.cost ?? 0
+  const costValue = (source) => {
+    if (source === 'Curtailment' || source === 'Consumption') {
+      return productionEnergy > 0
+        ? productionCost * energyValue(source) / productionEnergy
+        : 0
+    }
+    return energy[source]?.cost ?? 0
+  }
   const activeSources = SOURCES.filter(s => energyValue(s) > 0.001)
   const activeOther   = OTHER.filter(s => energyValue(s) > 0.001)
 

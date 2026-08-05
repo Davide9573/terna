@@ -179,7 +179,7 @@ export default function CostAnalysisPage() {
         </section>
 
         <section className="results-section">
-          <h2>Superficie di decarbonizzazione senza ricorso al nucleare</h2>
+          <h2>Superficie di decarbonizzazione escludendo il nucleare</h2>
           <p>
             Il grafico seguente fornisce una rappresentazione della superficie di decarbonizzazione
             nello spazio dei parametri k_pv, k_w e capacità di accumulo, ovvero la superficie
@@ -248,7 +248,7 @@ export default function CostAnalysisPage() {
         </section>
 
         <section className="results-section">
-          <h2>Superficie di decarbonizzazione con ricorso al nucleare</h2>
+          <h2>Superficie di decarbonizzazione includendo il nucleare</h2>
           <p>
             Il grafico seguente esplora le stesse combinazioni di potenza fotovoltaica ed eolica,
             sostituendo la produzione termica residua con il nucleare.
@@ -384,7 +384,7 @@ export default function CostAnalysisPage() {
 function LevelizedCostTable({ costs }) {
   const sources = Object.keys(costs.reference)
   const scenarios = [
-    { label: 'Attuale (2025)', value: costs.reference.Total, color: '#B22222' },
+    { label: 'Attuale (2025)', value: costs.reference.Total, color: '#606060' },
     { label: 'Solo rinnovabili', value: costs.without_nuclear.Total, color: '#4CAF50' },
     { label: 'Mix nucleare-rinnovabili', value: costs.with_nuclear.Total, color: '#0055FF' },
   ]

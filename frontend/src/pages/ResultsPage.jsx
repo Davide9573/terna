@@ -74,7 +74,7 @@ export default function ResultsPage() {
             </section>
 
             <section className="results-section">
-              <h2>Costi annui dello scenario simulato aggiuntivi rispetto allo scenario attuale — 2025</h2>
+              <h2>Costi aggiuntivi dello scenario simulato rispetto a quello di riferimento (2025)</h2>
               <CostTable costs={results.costs} />
             </section>
           </>
@@ -85,7 +85,8 @@ export default function ResultsPage() {
 }
 
 function CostTable({ costs }) {
-  const total = Object.values(costs).reduce((a, b) => a + b, 0)
+  const visibleCosts = Object.entries(costs).filter(([source]) => source !== 'Consumption')
+  const total = visibleCosts.reduce((sum, [, cost]) => sum + cost, 0)
   return (
     <div className="summary-table-wrapper">
       <table className="summary-table">
@@ -96,7 +97,7 @@ function CostTable({ costs }) {
           </tr>
         </thead>
         <tbody>
-          {Object.entries(costs).map(([src, cost]) => (
+          {visibleCosts.map(([src, cost]) => (
             <tr key={src}>
               <td>{src}</td>
               <td className={cost >= 0 ? 'cost-pos' : 'cost-neg'}>
@@ -115,7 +116,8 @@ function CostTable({ costs }) {
         </tfoot>
       </table>
       <p style={{fontSize:'0.78rem', color:'#888', marginTop:'0.6rem'}}>
-        Valori positivi = costo aggiuntivo rispetto allo scenario 2025; valori negativi = risparmio.
+        Valori positivi (in rosso) = costo aggiuntivo rispetto allo scenario 2025;
+        valori negativi (in verde) = risparmio.
         Costi annualizzati sulla base della durata del dataset.
       </p>
     </div>
