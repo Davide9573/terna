@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import pathlib
 import os
 import math
 import time
@@ -57,12 +58,14 @@ async def _load_power_data():
     global _power_data_2025, _decarbonization_surface, _decarbonization_surface_signature
     configured_engine = os.getenv("TERNA_SIMULATION_ENGINE", "python")
     selected_engine = "C++" if native_simulator.use_cpp_engine() else "Python"
+    cpp_files = [p.name for p in pathlib.Path("/app").glob("_terna_cpp*")]
     print(
         "INFO: Simulation engine: "
         f"{selected_engine} "
         f"(configured: {configured_engine}, C++ extension available: "
         f"{native_simulator.cpp_available()})"
     )
+    print("INFO: _terna_cpp files in /app:", cpp_files)
     _power_data_2025 = load_power_data_from_npz(NPZ_PATH)
     _power_data_2025.compute_energy()
     _decarbonization_surface = []
