@@ -22,11 +22,10 @@ import utility
 from utility import ElectricData, load_power_data_from_npz
 
 NPZ_PATH = Path(__file__).parent.parent / "power_2025.npz"
-SURFACE_CSV_PATH = Path(__file__).parent.parent / "decarbonization_surface.csv"
 
 DEFAULT_K_PV_RANGE = 20.0
 DEFAULT_K_W_RANGE = 20.0
-DEFAULT_STORAGE_CAPACITY_RANGE_TWH = 20.0
+DEFAULT_STORAGE_CAPACITY_RANGE_TWH = 25.0
 _DEFAULT_STORAGE_CAPACITY_RANGE_GWH = DEFAULT_STORAGE_CAPACITY_RANGE_TWH * 1_000
 
 app = FastAPI(title="Terna Energy Simulator API")
@@ -53,18 +52,13 @@ _decarbonization_surface_lock = Lock()
 
 @app.on_event("startup")
 async def _load_power_data():
-    """Load power data and the default decarbonization surface once at startup."""
+    """Load power data and initialize an empty decarbonization-surface cache."""
     global _power_data_2025, _decarbonization_surface, _decarbonization_surface_signature
     _power_data_2025 = load_power_data_from_npz(NPZ_PATH)
     _power_data_2025.compute_energy()
-    _decarbonization_surface = utility.load_decarbonization_surface_from_csv(SURFACE_CSV_PATH)
-    _decarbonization_surface_signature = _surface_signature(
-        DEFAULT_K_PV_RANGE,
-        DEFAULT_K_W_RANGE,
-        _DEFAULT_STORAGE_CAPACITY_RANGE_GWH,
-    )
+    _decarbonization_surface = []
+    _decarbonization_surface_signature = None
     print(f"✓ Power data (2025) loaded from {NPZ_PATH}")
-    print(f"✓ Decarbonization surface ({len(_decarbonization_surface)} points) loaded from {SURFACE_CSV_PATH}")
 
 # ── Immutable defaults (captured once at startup) ─────────────────────────────
 _DEFAULTS: dict[str, float] = {

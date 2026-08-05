@@ -11,7 +11,6 @@ export default function CostAnalysisPage() {
   const [ranges, setRanges] = useState({
     k_pv_range: 20,
     k_w_range: 20,
-    storage_capacity_range_twh: 20,
   })
   const [costs, setCosts] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -27,10 +26,7 @@ export default function CostAnalysisPage() {
     const storageSurfaceRequest = fetch('/api/decarbonization-surface', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...requestBody,
-        storage_capacity_range_twh: Number(ranges.storage_capacity_range_twh),
-      }),
+      body: JSON.stringify(requestBody),
     })
       .then(response => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -48,10 +44,7 @@ export default function CostAnalysisPage() {
     const costComparisonRequest = fetch('/api/conclusions-cost-comparison', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...requestBody,
-        storage_capacity_range_twh: Number(ranges.storage_capacity_range_twh),
-      }),
+      body: JSON.stringify(requestBody),
     })
       .then(response => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -150,20 +143,6 @@ export default function CostAnalysisPage() {
                   onChange={event => handleRangeChange('k_w_range', event.target.value)}
                 />
                 <span className="unit-badge">x</span>
-              </div>
-            </div>
-            <div className="param-field">
-              <label htmlFor="storage-capacity-range">Range capacita di accumulo</label>
-              <div className="input-unit-row">
-                <input
-                  id="storage-capacity-range"
-                  type="number"
-                  min="0.001"
-                  step="0.1"
-                  value={ranges.storage_capacity_range_twh}
-                  onChange={event => handleRangeChange('storage_capacity_range_twh', event.target.value)}
-                />
-                <span className="unit-badge">TWh</span>
               </div>
             </div>
           </div>
